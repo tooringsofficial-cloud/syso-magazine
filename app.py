@@ -130,13 +130,13 @@ def draw_embossed_text(draw, xy, text, font, fill_color="#FFFFFF"):
 
 def create_slide(data):
     bg_source = data.get('bg_source')
-    layout = data.get('layout', '상단 정렬')
+    layout_data = data.get('layout') # [수정] 표지는 문자열, 나머지는 숫자(Y좌표)
+    
     title_color = data.get('title_color', '#FFFFFF')
     body_color = data.get('body_color', '#FFFFFF')
     category = data.get('category', '') 
     keyword = data.get('keyword', '') 
     
-    # 사용자 지정 글씨 크기
     custom_sub_size = data.get('sub_size', 45) 
     custom_body_size = data.get('body_size', 40) 
 
@@ -203,11 +203,25 @@ def create_slide(data):
 
     title_lines = wrap_text(title, font_t, max_width, draw)
     body_lines = wrap_text(content, font_b, max_width, draw)
+    
+    # 높이 계산
     block_h = calculate_text_block_height(draw, title_lines, font_t, body_lines, font_b)
     
-    start_y = 150 
-    if layout == '중앙 정렬': start_y = (CANvas_HEIGHT - block_h) // 2
-    elif layout == '하단 정렬': start_y = CANvas_HEIGHT - block_h - 250 
+    # [좌표 결정 로직 분기]
+    # 표지는 문자열(정렬), 내용/아웃트로는 정수(Y좌표)
+    start_y = 150 # 기본값
+    
+    if type == 'cover':
+        # 표지는 기존 방식 유지
+        if layout_data == '중앙 정렬': start_y = (CANvas_HEIGHT - block_h) // 2
+        elif layout_data == '하단 정렬': start_y = CANvas_HEIGHT - block_h - 250
+        else: start_y = 150 # 상단
+    else:
+        # 내용 및 아웃트로는 슬라이더 값(정수) 사용
+        if isinstance(layout_data, int):
+            start_y = layout_data
+        else:
+            start_y = 150 # 혹시 모를 에러 방지용
 
     current_y = start_y
     
@@ -243,7 +257,7 @@ def create_slide(data):
             draw_embossed_text(draw, (margin_x, current_y), line, font=font_t, fill_color=title_color)
             current_y += (bbox[3] - bbox[1]) + 20
         
-        current_y += 60 # 간격 유지
+        current_y += 60 
         
         for line in body_lines:
             bbox = draw.textbbox((0, 0), line, font=font_b)
@@ -251,37 +265,17 @@ def create_slide(data):
             current_y += (bbox[3] - bbox[1]) + 15
             
     elif type == 'outro':
-        # [수정] 아웃트로: 레이아웃(상/중/하) 반영 + 가로는 항상 중앙 정렬
-        
-        # 1. 전체 텍스트 높이 계산 (위치 잡기용)
-        # 제목 높이 (한줄 가정, 혹은 대략적 계산)
-        bbox_t = draw.textbbox((0,0), title, font=font_t)
-        h_title_block = bbox_t[3] - bbox_t[1]
-        
-        # 부제목 높이 계산
-        outro_lines = wrap_text(content, font_b, CANvas_WIDTH - 200, draw)
-        h_sub_block = 0
-        if outro_lines:
-            for line in outro_lines:
-                bbox = draw.textbbox((0,0), line, font=font_b)
-                h_sub_block += (bbox[3] - bbox[1]) + 15
-        
-        total_outro_h = h_title_block + 30 + h_sub_block
-        
-        # 2. 시작 Y 좌표 결정 (레이아웃에 따라)
-        if layout == '상단 정렬':
-            outro_start_y = 150
-        elif layout == '하단 정렬':
-            outro_start_y = CANvas_HEIGHT - total_outro_h - 250
-        else: # 중앙 정렬
-            outro_start_y = (CANvas_HEIGHT - total_outro_h) // 2
-
-        current_outro_y = outro_start_y
+        # [수정] 아웃트로: Y좌표는 슬라이더 값(start_y) 사용
+        current_outro_y = start_y
 
         # 3. 제목 그리기 (BALANCE YOUR 컬러링 + 가로 중앙 정렬)
         full_title = title.strip()
         prefix = "BALANCE YOUR"
         
+        # 제목 높이 계산
+        bbox_t = draw.textbbox((0,0), "Text", font=font_t)
+        h_title = bbox_t[3] - bbox_t[1]
+
         if prefix in full_title:
             remainder = full_title.replace(prefix, "").strip()
             w_prefix = draw.textlength(prefix, font=font_t)
@@ -298,9 +292,11 @@ def create_slide(data):
             start_x = (CANvas_WIDTH - w_title) / 2
             draw.text((start_x, current_outro_y), full_title, font=font_t, fill="#FFFFFF")
         
-        current_outro_y += h_title_block + 30
+        current_outro_y += h_title + 30
 
         # 4. 부제목 그리기 (가로 중앙 정렬)
+        # wrap_text 결과 다시 사용 (이미 위에서 계산했으면 좋았겠지만 여기서 다시 호출해도 무방)
+        outro_lines = wrap_text(content, font_b, CANvas_WIDTH - 200, draw)
         if outro_lines:
             for line in outro_lines:
                 w_line = draw.textlength(line, font=font_b)
@@ -452,16 +448,24 @@ for i, img in enumerate(st.session_state['gallery_images']):
     label = f"[{img['source']}] 이미지 {i+1}" if img['source'] != 'Upload' else f"[내 사진] {img['name']}"
     bg_options[label] = img['urls']['regular']
 
-def editor_ui(key):
+# [수정] editor_ui 함수: use_slider 파라미터 추가
+def editor_ui(key, use_slider=False):
     c1, c2, c3 = st.columns(3)
-    with c1: layout = st.selectbox("레이아웃", ["상단 정렬", "중앙 정렬", "하단 정렬"], key=f"lo_{key}")
+    with c1:
+        if use_slider:
+            # 내용/아웃트로용 슬라이더 (0 ~ 1350)
+            layout = st.slider("텍스트 높이 조절 (Y축)", min_value=0, max_value=CANvas_HEIGHT, value=150, step=10, key=f"pos_{key}")
+        else:
+            # 표지용 선택박스
+            layout = st.selectbox("레이아웃", ["상단 정렬", "중앙 정렬", "하단 정렬"], key=f"lo_{key}")
+            
     with c2: t_col = st.color_picker("제목 색상", "#FFFFFF", key=f"tc_{key}")
     with c3: b_col = st.color_picker("본문 색상", "#FFFFFF", key=f"bc_{key}")
     st.write("배경 이미지 선택:")
     bg_key = st.selectbox("갤러리에서 선택", list(bg_options.keys()), key=f"bg_{key}")
     return layout, t_col, b_col, bg_options[bg_key]
 
-# (1) 표지
+# (1) 표지 - 기존 방식 유지 (use_slider=False)
 with tabs[0]:
     category = st.selectbox("주제 (Category)", ["DAY BALANCE", "NIGHT BALANCE", "LIVE BALANCE"], key="cat_cover")
     keyword = st.text_input("하단 키워드 (예: 붓기)", key="kw_cover")
@@ -471,14 +475,14 @@ with tabs[0]:
     
     sub_size = st.slider("부제목 크기", min_value=30, max_value=80, value=45, key="sub_size_cover")
     
-    layout, t_col, b_col, bg = editor_ui("cover")
+    layout, t_col, b_col, bg = editor_ui("cover", use_slider=False)
     st.session_state['slide_configs'][0] = {
         "type": "cover", "title": t, "content": c, "category": category, "keyword": keyword,
         "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col,
         "sub_size": sub_size 
     }
 
-# (2) 내용
+# (2) 내용 - 슬라이더 적용 (use_slider=True)
 for i in range(num_pages):
     with tabs[i+1]:
         t = st.text_area(f"소제목 {i+1}", key=f"tt_{i}", height=70)
@@ -486,23 +490,23 @@ for i in range(num_pages):
         
         body_size = st.slider(f"본문 크기 {i+1}", min_value=20, max_value=80, value=40, key=f"bs_{i}")
 
-        layout, t_col, b_col, bg = editor_ui(f"cont_{i}")
+        layout, t_col, b_col, bg = editor_ui(f"cont_{i}", use_slider=True)
         st.session_state['slide_configs'][i+1] = {
             "type": "content", "title": t, "content": c, "bg_source": bg, 
-            "layout": layout, "title_color": t_col, "body_color": b_col,
+            "layout": layout, # 이제 여기에는 숫자가 저장됨
+            "title_color": t_col, "body_color": b_col,
             "body_size": body_size 
         }
 
-# (3) 아웃트로
+# (3) 아웃트로 - 슬라이더 적용 (use_slider=True)
 with tabs[-1]:
     t = st.text_area("마지막 큰 문구", "BALANCE YOUR (LIFE)", height=70, key="t_outro")
     c = st.text_area("마지막 작은 문구 (부제목)", "팔로우 부탁드려요!", height=70, key="c_outro")
     
     st.caption("💡 'BALANCE YOUR' 뒤에 오는 단어는 자동으로 브랜드 컬러(#C2FF00)가 적용됩니다.")
-    st.caption("💡 배경 이미지는 원본 밝기 그대로 적용됩니다.")
-    st.caption("💡 아웃트로는 가로 중앙 정렬이 기본이며, 세로 위치는 레이아웃(상/중/하)을 따릅니다.")
+    st.caption("💡 아웃트로 텍스트의 높낮이를 슬라이더로 조절하세요.")
     
-    layout, t_col, b_col, bg = editor_ui("outro")
+    layout, t_col, b_col, bg = editor_ui("outro", use_slider=True)
     st.session_state['slide_configs'][total_pages-1] = {"type": "outro", "title": t, "content": c, "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col}
 
 # --- 3. 생성 ---
