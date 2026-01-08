@@ -130,7 +130,7 @@ def draw_embossed_text(draw, xy, text, font, fill_color="#FFFFFF"):
 
 def create_slide(data):
     bg_source = data.get('bg_source')
-    layout_data = data.get('layout') # [수정] 표지는 문자열, 나머지는 숫자(Y좌표)
+    layout_data = data.get('layout') 
     
     title_color = data.get('title_color', '#FFFFFF')
     body_color = data.get('body_color', '#FFFFFF')
@@ -144,14 +144,19 @@ def create_slide(data):
     draw = ImageDraw.Draw(img)
 
     # 1. 배경 이미지 합성
-    is_unsplash = False 
+    source_credit = "" # [수정] 저작권 텍스트 변수
     try:
         bg_img = None
         if bg_source:
             if isinstance(bg_source, str) and bg_source.startswith('http'):
                 res = requests.get(bg_source)
                 bg_img = Image.open(BytesIO(res.content)).convert('RGB')
-                if "images.unsplash.com" in bg_source: is_unsplash = True
+                
+                # [수정] URL 기반 출처 감지 로직
+                if "unsplash.com" in bg_source: source_credit = "Photo by Unsplash"
+                elif "pexels.com" in bg_source: source_credit = "Photo by Pexels"
+                elif "pixabay.com" in bg_source: source_credit = "Photo by Pixabay"
+
             elif hasattr(bg_source, 'read'):
                 bg_source.seek(0)
                 bg_img = Image.open(bg_source).convert('RGB')
@@ -178,12 +183,11 @@ def create_slide(data):
                     img.paste(dim, (0,0), dim)
     except Exception as e: print(f"배경 에러: {e}")
 
-    # 2. 저작권 표시 (Unsplash만)
-    if is_unsplash:
+    # 2. 저작권 표시 (통합 적용)
+    if source_credit:
         font_c = get_font(FONT_BODY_NAME, 20)
-        credit_text = "Photo by Unsplash"
-        bbox = draw.textbbox((0, 0), credit_text, font=font_c)
-        draw.text((CANvas_WIDTH - bbox[2] - 30, 30), credit_text, font=font_c, fill="#AAAAAA")
+        bbox = draw.textbbox((0, 0), source_credit, font=font_c)
+        draw.text((CANvas_WIDTH - bbox[2] - 30, 30), source_credit, font=font_c, fill="#AAAAAA")
 
     # 3. 텍스트 그리기 준비
     type = data.get('type', 'content')
@@ -203,25 +207,18 @@ def create_slide(data):
 
     title_lines = wrap_text(title, font_t, max_width, draw)
     body_lines = wrap_text(content, font_b, max_width, draw)
-    
-    # 높이 계산
     block_h = calculate_text_block_height(draw, title_lines, font_t, body_lines, font_b)
     
-    # [좌표 결정 로직 분기]
-    # 표지는 문자열(정렬), 내용/아웃트로는 정수(Y좌표)
     start_y = 150 # 기본값
-    
     if type == 'cover':
-        # 표지는 기존 방식 유지
         if layout_data == '중앙 정렬': start_y = (CANvas_HEIGHT - block_h) // 2
         elif layout_data == '하단 정렬': start_y = CANvas_HEIGHT - block_h - 250
-        else: start_y = 150 # 상단
+        else: start_y = 150 
     else:
-        # 내용 및 아웃트로는 슬라이더 값(정수) 사용
         if isinstance(layout_data, int):
             start_y = layout_data
         else:
-            start_y = 150 # 혹시 모를 에러 방지용
+            start_y = 150 
 
     current_y = start_y
     
@@ -265,14 +262,11 @@ def create_slide(data):
             current_y += (bbox[3] - bbox[1]) + 15
             
     elif type == 'outro':
-        # [수정] 아웃트로: Y좌표는 슬라이더 값(start_y) 사용
         current_outro_y = start_y
 
-        # 3. 제목 그리기 (BALANCE YOUR 컬러링 + 가로 중앙 정렬)
         full_title = title.strip()
         prefix = "BALANCE YOUR"
         
-        # 제목 높이 계산
         bbox_t = draw.textbbox((0,0), "Text", font=font_t)
         h_title = bbox_t[3] - bbox_t[1]
 
@@ -294,8 +288,6 @@ def create_slide(data):
         
         current_outro_y += h_title + 30
 
-        # 4. 부제목 그리기 (가로 중앙 정렬)
-        # wrap_text 결과 다시 사용 (이미 위에서 계산했으면 좋았겠지만 여기서 다시 호출해도 무방)
         outro_lines = wrap_text(content, font_b, CANvas_WIDTH - 200, draw)
         if outro_lines:
             for line in outro_lines:
@@ -326,7 +318,6 @@ def create_slide(data):
         logo_y = CANvas_HEIGHT - 100 
         img.paste(logo, (logo_x, logo_y), logo)
         
-        # [표지 전용] 하단 디자인
         if type == 'cover':
             font_footer = get_font(FONT_TITLE_NAME, 26)
             footer_text_y = logo_y + 25
@@ -448,15 +439,12 @@ for i, img in enumerate(st.session_state['gallery_images']):
     label = f"[{img['source']}] 이미지 {i+1}" if img['source'] != 'Upload' else f"[내 사진] {img['name']}"
     bg_options[label] = img['urls']['regular']
 
-# [수정] editor_ui 함수: use_slider 파라미터 추가
 def editor_ui(key, use_slider=False):
     c1, c2, c3 = st.columns(3)
     with c1:
         if use_slider:
-            # 내용/아웃트로용 슬라이더 (0 ~ 1350)
             layout = st.slider("텍스트 높이 조절 (Y축)", min_value=0, max_value=CANvas_HEIGHT, value=150, step=10, key=f"pos_{key}")
         else:
-            # 표지용 선택박스
             layout = st.selectbox("레이아웃", ["상단 정렬", "중앙 정렬", "하단 정렬"], key=f"lo_{key}")
             
     with c2: t_col = st.color_picker("제목 색상", "#FFFFFF", key=f"tc_{key}")
@@ -465,7 +453,7 @@ def editor_ui(key, use_slider=False):
     bg_key = st.selectbox("갤러리에서 선택", list(bg_options.keys()), key=f"bg_{key}")
     return layout, t_col, b_col, bg_options[bg_key]
 
-# (1) 표지 - 기존 방식 유지 (use_slider=False)
+# (1) 표지
 with tabs[0]:
     category = st.selectbox("주제 (Category)", ["DAY BALANCE", "NIGHT BALANCE", "LIVE BALANCE"], key="cat_cover")
     keyword = st.text_input("하단 키워드 (예: 붓기)", key="kw_cover")
@@ -482,7 +470,7 @@ with tabs[0]:
         "sub_size": sub_size 
     }
 
-# (2) 내용 - 슬라이더 적용 (use_slider=True)
+# (2) 내용
 for i in range(num_pages):
     with tabs[i+1]:
         t = st.text_area(f"소제목 {i+1}", key=f"tt_{i}", height=70)
@@ -493,12 +481,12 @@ for i in range(num_pages):
         layout, t_col, b_col, bg = editor_ui(f"cont_{i}", use_slider=True)
         st.session_state['slide_configs'][i+1] = {
             "type": "content", "title": t, "content": c, "bg_source": bg, 
-            "layout": layout, # 이제 여기에는 숫자가 저장됨
+            "layout": layout, 
             "title_color": t_col, "body_color": b_col,
             "body_size": body_size 
         }
 
-# (3) 아웃트로 - 슬라이더 적용 (use_slider=True)
+# (3) 아웃트로
 with tabs[-1]:
     t = st.text_area("마지막 큰 문구", "BALANCE YOUR (LIFE)", height=70, key="t_outro")
     c = st.text_area("마지막 작은 문구 (부제목)", "팔로우 부탁드려요!", height=70, key="c_outro")
