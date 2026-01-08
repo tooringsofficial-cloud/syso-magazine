@@ -136,9 +136,9 @@ def create_slide(data):
     category = data.get('category', '') 
     keyword = data.get('keyword', '') 
     
-    # [설정] 사용자 지정 글씨 크기 가져오기
-    custom_sub_size = data.get('sub_size', 45) # 표지 부제목 기본값 45
-    custom_body_size = data.get('body_size', 40) # 내용 본문 기본값 40
+    # 사용자 지정 글씨 크기
+    custom_sub_size = data.get('sub_size', 45) 
+    custom_body_size = data.get('body_size', 40) 
 
     img = Image.new('RGB', (CANvas_WIDTH, CANvas_HEIGHT), "#1A1A1A")
     draw = ImageDraw.Draw(img)
@@ -243,8 +243,7 @@ def create_slide(data):
             draw_embossed_text(draw, (margin_x, current_y), line, font=font_t, fill_color=title_color)
             current_y += (bbox[3] - bbox[1]) + 20
         
-        # [수정] 표지 제목과 부제목 사이 간격 늘림 (20 -> 60)
-        current_y += 60 
+        current_y += 60 # 간격 유지
         
         for line in body_lines:
             bbox = draw.textbbox((0, 0), line, font=font_b)
@@ -252,9 +251,34 @@ def create_slide(data):
             current_y += (bbox[3] - bbox[1]) + 15
             
     elif type == 'outro':
-        # [수정] 아웃트로 전용 로직: BALANCE YOUR (KEYWORD) + 중앙 정렬 + 에러 해결
+        # [수정] 아웃트로: 레이아웃(상/중/하) 반영 + 가로는 항상 중앙 정렬
         
-        # 1. 아웃트로 메인 텍스트 처리
+        # 1. 전체 텍스트 높이 계산 (위치 잡기용)
+        # 제목 높이 (한줄 가정, 혹은 대략적 계산)
+        bbox_t = draw.textbbox((0,0), title, font=font_t)
+        h_title_block = bbox_t[3] - bbox_t[1]
+        
+        # 부제목 높이 계산
+        outro_lines = wrap_text(content, font_b, CANvas_WIDTH - 200, draw)
+        h_sub_block = 0
+        if outro_lines:
+            for line in outro_lines:
+                bbox = draw.textbbox((0,0), line, font=font_b)
+                h_sub_block += (bbox[3] - bbox[1]) + 15
+        
+        total_outro_h = h_title_block + 30 + h_sub_block
+        
+        # 2. 시작 Y 좌표 결정 (레이아웃에 따라)
+        if layout == '상단 정렬':
+            outro_start_y = 150
+        elif layout == '하단 정렬':
+            outro_start_y = CANvas_HEIGHT - total_outro_h - 250
+        else: # 중앙 정렬
+            outro_start_y = (CANvas_HEIGHT - total_outro_h) // 2
+
+        current_outro_y = outro_start_y
+
+        # 3. 제목 그리기 (BALANCE YOUR 컬러링 + 가로 중앙 정렬)
         full_title = title.strip()
         prefix = "BALANCE YOUR"
         
@@ -266,31 +290,25 @@ def create_slide(data):
             total_w = w_prefix + w_space + w_remain
             
             start_x = (CANvas_WIDTH - total_w) / 2
-            outro_y = (CANvas_HEIGHT - (font_t_size + 30 + font_b_size)) / 2 - 50
-
-            draw.text((start_x, outro_y), prefix, font=font_t, fill="#FFFFFF") 
-            draw.text((start_x + w_prefix + w_space, outro_y), remainder, font=font_t, fill=BRAND_COLOR) 
-            current_y = outro_y + font_t_size + 30
+            
+            draw.text((start_x, current_outro_y), prefix, font=font_t, fill="#FFFFFF") 
+            draw.text((start_x + w_prefix + w_space, current_outro_y), remainder, font=font_t, fill=BRAND_COLOR) 
         else:
             w_title = draw.textlength(full_title, font=font_t)
             start_x = (CANvas_WIDTH - w_title) / 2
-            outro_y = (CANvas_HEIGHT - (font_t_size + 30 + font_b_size)) // 2 - 50
-            draw.text((start_x, outro_y), full_title, font=font_t, fill="#FFFFFF")
-            current_y = outro_y + font_t_size + 30
+            draw.text((start_x, current_outro_y), full_title, font=font_t, fill="#FFFFFF")
+        
+        current_outro_y += h_title_block + 30
 
-        # 2. 아웃트로 부제목 (에러 수정: 여러 줄 처리)
-        if content:
-            # 부제목도 wrap_text를 사용하여 여러 줄로 나눔
-            outro_lines = wrap_text(content, font_b, CANvas_WIDTH - 200, draw)
-            
+        # 4. 부제목 그리기 (가로 중앙 정렬)
+        if outro_lines:
             for line in outro_lines:
                 w_line = draw.textlength(line, font=font_b)
                 start_x_line = (CANvas_WIDTH - w_line) / 2
-                draw.text((start_x_line, current_y), line, font=font_b, fill="#DDDDDD")
+                draw.text((start_x_line, current_outro_y), line, font=font_b, fill="#DDDDDD")
                 
-                # 다음 줄 위치 계산
                 bbox = draw.textbbox((0, 0), line, font=font_b)
-                current_y += (bbox[3] - bbox[1]) + 15
+                current_outro_y += (bbox[3] - bbox[1]) + 15
 
     else: # 일반 내용 페이지
         for line in title_lines:
@@ -451,7 +469,6 @@ with tabs[0]:
     t = st.text_area("표지 제목", "제목을\n입력하세요", height=100, key="t_cover")
     c = st.text_area("표지 부제목", "부제목을 입력하세요", height=70, key="c_cover")
     
-    # [수정] 부제목 글씨 크기 조절 슬라이더
     sub_size = st.slider("부제목 크기", min_value=30, max_value=80, value=45, key="sub_size_cover")
     
     layout, t_col, b_col, bg = editor_ui("cover")
@@ -467,7 +484,6 @@ for i in range(num_pages):
         t = st.text_area(f"소제목 {i+1}", key=f"tt_{i}", height=70)
         c = st.text_area(f"본문 {i+1}", key=f"cc_{i}", height=150)
         
-        # [수정] 본문 글씨 크기 조절 슬라이더
         body_size = st.slider(f"본문 크기 {i+1}", min_value=20, max_value=80, value=40, key=f"bs_{i}")
 
         layout, t_col, b_col, bg = editor_ui(f"cont_{i}")
@@ -484,6 +500,7 @@ with tabs[-1]:
     
     st.caption("💡 'BALANCE YOUR' 뒤에 오는 단어는 자동으로 브랜드 컬러(#C2FF00)가 적용됩니다.")
     st.caption("💡 배경 이미지는 원본 밝기 그대로 적용됩니다.")
+    st.caption("💡 아웃트로는 가로 중앙 정렬이 기본이며, 세로 위치는 레이아웃(상/중/하)을 따릅니다.")
     
     layout, t_col, b_col, bg = editor_ui("outro")
     st.session_state['slide_configs'][total_pages-1] = {"type": "outro", "title": t, "content": c, "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col}
