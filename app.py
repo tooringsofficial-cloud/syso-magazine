@@ -6,7 +6,7 @@ import zipfile
 import os
 
 # ==========================================
-# [설정] API 키 관리 (멀티 플랫폼)
+# [설정] API 키 관리
 # ==========================================
 UNSPLASH_ACCESS_KEY = "866tz8GXjPx2sjBhd9p58nNM5fyuBsk5LRyU8HPQfiU"
 PEXELS_API_KEY = "dP09tHiW7RyniXLXnJdbV2aEpbAl86XYnYQZGoGo7Cpta9fFhPSJRDgp"
@@ -26,7 +26,7 @@ BRAND_COLOR = "#C2FF00"
 ALIGN_LEFT_X = 80 
 
 # ==========================================
-# [함수] 이미지 소스별 검색 로직 (통합)
+# [함수] 이미지 검색
 # ==========================================
 def search_unsplash(query, page=1):
     if "866tz" not in UNSPLASH_ACCESS_KEY and "여기에" in UNSPLASH_ACCESS_KEY:
@@ -128,6 +128,27 @@ def draw_embossed_text(draw, xy, text, font, fill_color="#FFFFFF"):
     draw.text((x+1, y+1), text, font=font, fill="#333333") 
     draw.text((x, y), text, font=font, fill=fill_color)
 
+# [신규] 말풍선 그리기 함수
+def draw_bubble(draw, text, x, y, font_size=30):
+    font = get_font(FONT_BODY_NAME, font_size)
+    padding = 20
+    bbox = draw.textbbox((0, 0), text, font=font)
+    w = bbox[2] - bbox[0] + (padding * 2)
+    h = bbox[3] - bbox[1] + (padding * 2)
+    
+    # 둥근 사각형 (말풍선 본체)
+    draw.rounded_rectangle([(x, y), (x + w, y + h)], radius=20, fill="#FFFFFF")
+    
+    # 텍스트 (검은색)
+    draw.text((x + padding, y + padding - 5), text, font=font, fill="#000000")
+    
+    # 말풍선 꼬리 (하단 중앙)
+    tail_w = 20
+    tail_h = 15
+    tail_x = x + (w / 2)
+    draw.polygon([(tail_x - tail_w/2, y + h - 1), (tail_x + tail_w/2, y + h - 1), (tail_x, y + h + tail_h)], fill="#FFFFFF")
+
+
 def create_slide(data):
     bg_source = data.get('bg_source')
     layout_data = data.get('layout') 
@@ -139,12 +160,18 @@ def create_slide(data):
     
     custom_sub_size = data.get('sub_size', 45) 
     custom_body_size = data.get('body_size', 40) 
+    
+    # [신규] 옵션 가져오기
+    use_tint = data.get('use_tint', True) # 배경 흐림 여부
+    bubble_text = data.get('bubble_text', '') # 말풍선 내용
+    bubble_x = data.get('bubble_x', 540)
+    bubble_y = data.get('bubble_y', 500)
 
     img = Image.new('RGB', (CANvas_WIDTH, CANvas_HEIGHT), "#1A1A1A")
     draw = ImageDraw.Draw(img)
 
     # 1. 배경 이미지 합성
-    source_credit = "" # [수정] 저작권 텍스트 변수
+    source_credit = "" 
     try:
         bg_img = None
         if bg_source:
@@ -152,7 +179,6 @@ def create_slide(data):
                 res = requests.get(bg_source)
                 bg_img = Image.open(BytesIO(res.content)).convert('RGB')
                 
-                # [수정] URL 기반 출처 감지 로직
                 if "unsplash.com" in bg_source: source_credit = "Photo by Unsplash"
                 elif "pexels.com" in bg_source: source_credit = "Photo by Pexels"
                 elif "pixabay.com" in bg_source: source_credit = "Photo by Pixabay"
@@ -177,18 +203,20 @@ def create_slide(data):
                 bg_img = bg_img.resize((new_w, new_h), Image.LANCZOS)
                 img.paste(bg_img, (-offset_x, -offset_y))
                 
-                # 아웃트로가 아닐 때만 틴트
-                if data.get('type') != 'outro':
+                # [수정] 배경 흐림(Tint) 옵션 적용
+                if use_tint and data.get('type') != 'outro':
                     dim = Image.new('RGBA', img.size, (0, 0, 0, 110))
                     img.paste(dim, (0,0), dim)
     except Exception as e: print(f"배경 에러: {e}")
 
-    # 2. 저작권 표시 (통합 적용)
+    # 2. 저작권 표시
     if source_credit:
         font_c = get_font(FONT_BODY_NAME, 20)
         bbox = draw.textbbox((0, 0), source_credit, font=font_c)
         draw.text((CANvas_WIDTH - bbox[2] - 30, 30), source_credit, font=font_c, fill="#AAAAAA")
 
+    # [신규] 말풍선 그리기 (텍스트보다 뒤에 그릴지 앞에 그릴지 결정 - 여기선 텍스트랑 겹칠 수 있으니 맨 마지막에 그리는 게 좋음)
+    
     # 3. 텍스트 그리기 준비
     type = data.get('type', 'content')
     title = data.get('title', '')
@@ -209,7 +237,7 @@ def create_slide(data):
     body_lines = wrap_text(content, font_b, max_width, draw)
     block_h = calculate_text_block_height(draw, title_lines, font_t, body_lines, font_b)
     
-    start_y = 150 # 기본값
+    start_y = 150 
     if type == 'cover':
         if layout_data == '중앙 정렬': start_y = (CANvas_HEIGHT - block_h) // 2
         elif layout_data == '하단 정렬': start_y = CANvas_HEIGHT - block_h - 250
@@ -248,7 +276,7 @@ def create_slide(data):
         draw.text((box_x + box_w + 10, header_y + box_padding_y - 2), mag_text, font=font_header, fill=BRAND_COLOR)
 
     # 텍스트 출력 로직
-    if type == 'cover': # 양각
+    if type == 'cover': 
         for line in title_lines:
             bbox = draw.textbbox((0, 0), line, font=font_t)
             draw_embossed_text(draw, (margin_x, current_y), line, font=font_t, fill_color=title_color)
@@ -309,6 +337,10 @@ def create_slide(data):
                 bbox = draw.textbbox((0, 0), line, font=font_b)
                 draw.text((margin_x, current_y), line, font=font_b, fill=body_color)
                 current_y += (bbox[3] - bbox[1]) + 15
+
+    # [신규] 말풍선 그리기 (맨 위 레이어)
+    if bubble_text:
+        draw_bubble(draw, bubble_text, bubble_x, bubble_y)
 
     # 4. 공통 로고 및 하단 (모든 페이지 중앙 하단)
     try:
@@ -449,9 +481,12 @@ def editor_ui(key, use_slider=False):
             
     with c2: t_col = st.color_picker("제목 색상", "#FFFFFF", key=f"tc_{key}")
     with c3: b_col = st.color_picker("본문 색상", "#FFFFFF", key=f"bc_{key}")
-    st.write("배경 이미지 선택:")
-    bg_key = st.selectbox("갤러리에서 선택", list(bg_options.keys()), key=f"bg_{key}")
-    return layout, t_col, b_col, bg_options[bg_key]
+    
+    st.write("배경 설정:")
+    bg_key = st.selectbox("배경 이미지 선택", list(bg_options.keys()), key=f"bg_{key}")
+    use_tint = st.checkbox("배경 어둡게 하기 (Tint)", value=True, key=f"tint_{key}") # [신규]
+    
+    return layout, t_col, b_col, bg_options[bg_key], use_tint
 
 # (1) 표지
 with tabs[0]:
@@ -460,14 +495,22 @@ with tabs[0]:
     
     t = st.text_area("표지 제목", "제목을\n입력하세요", height=100, key="t_cover")
     c = st.text_area("표지 부제목", "부제목을 입력하세요", height=70, key="c_cover")
-    
     sub_size = st.slider("부제목 크기", min_value=30, max_value=80, value=45, key="sub_size_cover")
     
-    layout, t_col, b_col, bg = editor_ui("cover", use_slider=False)
+    # [신규] 말풍선 설정
+    with st.expander("💬 말풍선 추가 (옵션)"):
+        bubble_text = st.text_input("말풍선 문구", key="bub_t_cover")
+        b_c1, b_c2 = st.columns(2)
+        bubble_x = b_c1.slider("가로 위치 (X)", 0, CANvas_WIDTH, 540, key="bub_x_cover")
+        bubble_y = b_c2.slider("세로 위치 (Y)", 0, CANvas_HEIGHT, 500, key="bub_y_cover")
+    
+    layout, t_col, b_col, bg, use_tint = editor_ui("cover", use_slider=False)
+    
     st.session_state['slide_configs'][0] = {
         "type": "cover", "title": t, "content": c, "category": category, "keyword": keyword,
         "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col,
-        "sub_size": sub_size 
+        "sub_size": sub_size, "use_tint": use_tint,
+        "bubble_text": bubble_text, "bubble_x": bubble_x, "bubble_y": bubble_y
     }
 
 # (2) 내용
@@ -475,15 +518,22 @@ for i in range(num_pages):
     with tabs[i+1]:
         t = st.text_area(f"소제목 {i+1}", key=f"tt_{i}", height=70)
         c = st.text_area(f"본문 {i+1}", key=f"cc_{i}", height=150)
-        
         body_size = st.slider(f"본문 크기 {i+1}", min_value=20, max_value=80, value=40, key=f"bs_{i}")
 
-        layout, t_col, b_col, bg = editor_ui(f"cont_{i}", use_slider=True)
+        # [신규] 말풍선 설정
+        with st.expander("💬 말풍선 추가 (옵션)"):
+            bubble_text = st.text_input("말풍선 문구", key=f"bub_t_{i}")
+            b_c1, b_c2 = st.columns(2)
+            bubble_x = b_c1.slider("가로 위치 (X)", 0, CANvas_WIDTH, 540, key=f"bub_x_{i}")
+            bubble_y = b_c2.slider("세로 위치 (Y)", 0, CANvas_HEIGHT, 500, key=f"bub_y_{i}")
+
+        layout, t_col, b_col, bg, use_tint = editor_ui(f"cont_{i}", use_slider=True)
+        
         st.session_state['slide_configs'][i+1] = {
             "type": "content", "title": t, "content": c, "bg_source": bg, 
-            "layout": layout, 
-            "title_color": t_col, "body_color": b_col,
-            "body_size": body_size 
+            "layout": layout, "title_color": t_col, "body_color": b_col,
+            "body_size": body_size, "use_tint": use_tint,
+            "bubble_text": bubble_text, "bubble_x": bubble_x, "bubble_y": bubble_y
         }
 
 # (3) 아웃트로
@@ -491,10 +541,9 @@ with tabs[-1]:
     t = st.text_area("마지막 큰 문구", "BALANCE YOUR (LIFE)", height=70, key="t_outro")
     c = st.text_area("마지막 작은 문구 (부제목)", "팔로우 부탁드려요!", height=70, key="c_outro")
     
-    st.caption("💡 'BALANCE YOUR' 뒤에 오는 단어는 자동으로 브랜드 컬러(#C2FF00)가 적용됩니다.")
-    st.caption("💡 아웃트로 텍스트의 높낮이를 슬라이더로 조절하세요.")
+    st.caption("💡 아웃트로는 가로 중앙 정렬이 기본이며, 세로 위치는 레이아웃(상/중/하)을 따릅니다.")
     
-    layout, t_col, b_col, bg = editor_ui("outro", use_slider=True)
+    layout, t_col, b_col, bg, _ = editor_ui("outro", use_slider=True)
     st.session_state['slide_configs'][total_pages-1] = {"type": "outro", "title": t, "content": c, "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col}
 
 # --- 3. 생성 ---
