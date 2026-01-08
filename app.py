@@ -172,7 +172,7 @@ def create_slide(data):
                 bg_img = bg_img.resize((new_w, new_h), Image.LANCZOS)
                 img.paste(bg_img, (-offset_x, -offset_y))
                 
-                # [수정] 아웃트로(outro)가 아닐 때만 배경 어둡게 처리 (아웃트로는 원본 유지)
+                # 아웃트로가 아닐 때만 틴트
                 if data.get('type') != 'outro':
                     dim = Image.new('RGBA', img.size, (0, 0, 0, 110))
                     img.paste(dim, (0,0), dim)
@@ -191,7 +191,6 @@ def create_slide(data):
     content = data.get('content', '')
 
     font_t_size = 90 if type == 'cover' else 60
-    # [수정] 사용자 지정 크기 적용
     font_b_size = custom_sub_size if type == 'cover' else custom_body_size
     
     if type == 'outro': font_t_size, font_b_size = 80, 50
@@ -243,54 +242,55 @@ def create_slide(data):
             bbox = draw.textbbox((0, 0), line, font=font_t)
             draw_embossed_text(draw, (margin_x, current_y), line, font=font_t, fill_color=title_color)
             current_y += (bbox[3] - bbox[1]) + 20
-        current_y += 20
+        
+        # [수정] 표지 제목과 부제목 사이 간격 늘림 (20 -> 60)
+        current_y += 60 
+        
         for line in body_lines:
             bbox = draw.textbbox((0, 0), line, font=font_b)
             draw_embossed_text(draw, (margin_x, current_y), line, font=font_b, fill_color=body_color)
             current_y += (bbox[3] - bbox[1]) + 15
             
     elif type == 'outro':
-        # [수정] 아웃트로 전용 로직: BALANCE YOUR (KEYWORD) 컬러링 + 중앙 정렬
+        # [수정] 아웃트로 전용 로직: BALANCE YOUR (KEYWORD) + 중앙 정렬 + 에러 해결
         
-        # 1. 아웃트로 메인 텍스트 처리 (BALANCE YOUR ...)
+        # 1. 아웃트로 메인 텍스트 처리
         full_title = title.strip()
-        
-        # 항상 중앙 정렬 계산 (Layout 무시)
-        # 텍스트 분리: "BALANCE YOUR" 와 나머지 부분
         prefix = "BALANCE YOUR"
         
         if prefix in full_title:
             remainder = full_title.replace(prefix, "").strip()
-            
-            # 너비 계산
             w_prefix = draw.textlength(prefix, font=font_t)
             w_space = draw.textlength(" ", font=font_t)
             w_remain = draw.textlength(remainder, font=font_t)
             total_w = w_prefix + w_space + w_remain
             
-            # 중앙 시작점
             start_x = (CANvas_WIDTH - total_w) / 2
-            # 높이 계산 (중앙)
-            outro_y = (CANvas_HEIGHT - (font_t_size + 30 + font_b_size)) / 2 - 50 # 약간 위로
+            outro_y = (CANvas_HEIGHT - (font_t_size + 30 + font_b_size)) / 2 - 50
 
-            # 그리기
-            draw.text((start_x, outro_y), prefix, font=font_t, fill="#FFFFFF") # 흰색
-            draw.text((start_x + w_prefix + w_space, outro_y), remainder, font=font_t, fill=BRAND_COLOR) # 브랜드 컬러
-            
+            draw.text((start_x, outro_y), prefix, font=font_t, fill="#FFFFFF") 
+            draw.text((start_x + w_prefix + w_space, outro_y), remainder, font=font_t, fill=BRAND_COLOR) 
             current_y = outro_y + font_t_size + 30
         else:
-            # BALANCE YOUR가 없는 일반 문구일 경우 그냥 중앙 정렬 흰색
             w_title = draw.textlength(full_title, font=font_t)
             start_x = (CANvas_WIDTH - w_title) / 2
             outro_y = (CANvas_HEIGHT - (font_t_size + 30 + font_b_size)) // 2 - 50
             draw.text((start_x, outro_y), full_title, font=font_t, fill="#FFFFFF")
             current_y = outro_y + font_t_size + 30
 
-        # 2. 아웃트로 부제목 (작은 문구) 중앙 정렬
+        # 2. 아웃트로 부제목 (에러 수정: 여러 줄 처리)
         if content:
-            w_sub = draw.textlength(content, font=font_b)
-            start_x_sub = (CANvas_WIDTH - w_sub) / 2
-            draw.text((start_x_sub, current_y), content, font=font_b, fill="#DDDDDD")
+            # 부제목도 wrap_text를 사용하여 여러 줄로 나눔
+            outro_lines = wrap_text(content, font_b, CANvas_WIDTH - 200, draw)
+            
+            for line in outro_lines:
+                w_line = draw.textlength(line, font=font_b)
+                start_x_line = (CANvas_WIDTH - w_line) / 2
+                draw.text((start_x_line, current_y), line, font=font_b, fill="#DDDDDD")
+                
+                # 다음 줄 위치 계산
+                bbox = draw.textbbox((0, 0), line, font=font_b)
+                current_y += (bbox[3] - bbox[1]) + 15
 
     else: # 일반 내용 페이지
         for line in title_lines:
@@ -458,7 +458,7 @@ with tabs[0]:
     st.session_state['slide_configs'][0] = {
         "type": "cover", "title": t, "content": c, "category": category, "keyword": keyword,
         "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col,
-        "sub_size": sub_size # [추가] 부제목 크기 저장
+        "sub_size": sub_size 
     }
 
 # (2) 내용
@@ -474,7 +474,7 @@ for i in range(num_pages):
         st.session_state['slide_configs'][i+1] = {
             "type": "content", "title": t, "content": c, "bg_source": bg, 
             "layout": layout, "title_color": t_col, "body_color": b_col,
-            "body_size": body_size # [추가] 본문 크기 저장
+            "body_size": body_size 
         }
 
 # (3) 아웃트로
