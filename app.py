@@ -128,24 +128,36 @@ def draw_embossed_text(draw, xy, text, font, fill_color="#FFFFFF"):
     draw.text((x+1, y+1), text, font=font, fill="#333333") 
     draw.text((x, y), text, font=font, fill=fill_color)
 
-# [신규] 말풍선 그리기 함수
+# [수정] 말풍선 함수: 둥글기 증가, 볼드체 적용, 꼬리 위치 자동화
 def draw_bubble(draw, text, x, y, font_size=30):
-    font = get_font(FONT_BODY_NAME, font_size)
+    # 1. 폰트 변경: 가독성을 위해 Bold체 사용
+    font = get_font(FONT_TITLE_NAME, font_size) 
+    
     padding = 20
     bbox = draw.textbbox((0, 0), text, font=font)
     w = bbox[2] - bbox[0] + (padding * 2)
     h = bbox[3] - bbox[1] + (padding * 2)
     
-    # 둥근 사각형 (말풍선 본체)
-    draw.rounded_rectangle([(x, y), (x + w, y + h)], radius=20, fill="#FFFFFF")
+    # 2. 둥글기(Radius) 증가: 20 -> 35
+    radius = 35
+    draw.rounded_rectangle([(x, y), (x + w, y + h)], radius=radius, fill="#FFFFFF")
     
     # 텍스트 (검은색)
     draw.text((x + padding, y + padding - 5), text, font=font, fill="#000000")
     
-    # 말풍선 꼬리 (하단 중앙)
+    # 3. 꼬리 위치 자동 계산 (Dynamic Tail)
+    # 말풍선이 화면의 어디쯤 있는지 비율 계산 (0.0: 왼쪽 끝 ~ 1.0: 오른쪽 끝)
+    bubble_center_x = x + (w / 2)
+    screen_ratio = bubble_center_x / CANvas_WIDTH
+    
+    # 꼬리의 X 좌표를 비율에 맞춰 이동
+    # 말풍선 너비(w) 내에서 움직이되, 둥근 모서리를 침범하지 않도록 제한(clamp)
+    tail_target_x = x + (w * screen_ratio)
+    tail_x = max(x + radius + 10, min(tail_target_x, x + w - radius - 10))
+    
     tail_w = 20
     tail_h = 15
-    tail_x = x + (w / 2)
+    
     draw.polygon([(tail_x - tail_w/2, y + h - 1), (tail_x + tail_w/2, y + h - 1), (tail_x, y + h + tail_h)], fill="#FFFFFF")
 
 
@@ -161,9 +173,8 @@ def create_slide(data):
     custom_sub_size = data.get('sub_size', 45) 
     custom_body_size = data.get('body_size', 40) 
     
-    # [신규] 옵션 가져오기
-    use_tint = data.get('use_tint', True) # 배경 흐림 여부
-    bubble_text = data.get('bubble_text', '') # 말풍선 내용
+    use_tint = data.get('use_tint', True) 
+    bubble_text = data.get('bubble_text', '') 
     bubble_x = data.get('bubble_x', 540)
     bubble_y = data.get('bubble_y', 500)
 
@@ -203,7 +214,7 @@ def create_slide(data):
                 bg_img = bg_img.resize((new_w, new_h), Image.LANCZOS)
                 img.paste(bg_img, (-offset_x, -offset_y))
                 
-                # [수정] 배경 흐림(Tint) 옵션 적용
+                # 배경 흐림(Tint) 옵션 적용
                 if use_tint and data.get('type') != 'outro':
                     dim = Image.new('RGBA', img.size, (0, 0, 0, 110))
                     img.paste(dim, (0,0), dim)
@@ -215,8 +226,6 @@ def create_slide(data):
         bbox = draw.textbbox((0, 0), source_credit, font=font_c)
         draw.text((CANvas_WIDTH - bbox[2] - 30, 30), source_credit, font=font_c, fill="#AAAAAA")
 
-    # [신규] 말풍선 그리기 (텍스트보다 뒤에 그릴지 앞에 그릴지 결정 - 여기선 텍스트랑 겹칠 수 있으니 맨 마지막에 그리는 게 좋음)
-    
     # 3. 텍스트 그리기 준비
     type = data.get('type', 'content')
     title = data.get('title', '')
@@ -338,7 +347,7 @@ def create_slide(data):
                 draw.text((margin_x, current_y), line, font=font_b, fill=body_color)
                 current_y += (bbox[3] - bbox[1]) + 15
 
-    # [신규] 말풍선 그리기 (맨 위 레이어)
+    # [말풍선 그리기]
     if bubble_text:
         draw_bubble(draw, bubble_text, bubble_x, bubble_y)
 
@@ -484,7 +493,7 @@ def editor_ui(key, use_slider=False):
     
     st.write("배경 설정:")
     bg_key = st.selectbox("배경 이미지 선택", list(bg_options.keys()), key=f"bg_{key}")
-    use_tint = st.checkbox("배경 어둡게 하기 (Tint)", value=True, key=f"tint_{key}") # [신규]
+    use_tint = st.checkbox("배경 어둡게 하기 (Tint)", value=True, key=f"tint_{key}")
     
     return layout, t_col, b_col, bg_options[bg_key], use_tint
 
@@ -497,7 +506,6 @@ with tabs[0]:
     c = st.text_area("표지 부제목", "부제목을 입력하세요", height=70, key="c_cover")
     sub_size = st.slider("부제목 크기", min_value=30, max_value=80, value=45, key="sub_size_cover")
     
-    # [신규] 말풍선 설정
     with st.expander("💬 말풍선 추가 (옵션)"):
         bubble_text = st.text_input("말풍선 문구", key="bub_t_cover")
         b_c1, b_c2 = st.columns(2)
@@ -520,7 +528,6 @@ for i in range(num_pages):
         c = st.text_area(f"본문 {i+1}", key=f"cc_{i}", height=150)
         body_size = st.slider(f"본문 크기 {i+1}", min_value=20, max_value=80, value=40, key=f"bs_{i}")
 
-        # [신규] 말풍선 설정
         with st.expander("💬 말풍선 추가 (옵션)"):
             bubble_text = st.text_input("말풍선 문구", key=f"bub_t_{i}")
             b_c1, b_c2 = st.columns(2)
