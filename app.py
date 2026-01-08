@@ -8,13 +8,8 @@ import os
 # ==========================================
 # [설정] API 키 관리 (멀티 플랫폼)
 # ==========================================
-# 1. Unsplash (기존 키 유지)
 UNSPLASH_ACCESS_KEY = "866tz8GXjPx2sjBhd9p58nNM5fyuBsk5LRyU8HPQfiU"
-
-# 2. Pexels (여기에 키를 입력하세요!)
 PEXELS_API_KEY = "dP09tHiW7RyniXLXnJdbV2aEpbAl86XYnYQZGoGo7Cpta9fFhPSJRDgp"
-
-# 3. Pixabay (여기에 키를 입력하세요!)
 PIXABAY_API_KEY = "54085998-ef78c84d4ce4500e6d211c19d"
 
 # ==========================================
@@ -28,13 +23,11 @@ CANvas_WIDTH = 1080
 CANvas_HEIGHT = 1350
 BRAND_COLOR = "#C2FF00" 
 
-# [중요] 칼각 정렬을 위한 기준선 정의
-ALIGN_LEFT_X = 80  # 모든 요소는 왼쪽에서 80px 떨어져서 시작
+ALIGN_LEFT_X = 80 
 
 # ==========================================
 # [함수] 이미지 소스별 검색 로직 (통합)
 # ==========================================
-
 def search_unsplash(query, page=1):
     if "866tz" not in UNSPLASH_ACCESS_KEY and "여기에" in UNSPLASH_ACCESS_KEY:
         st.error("Unsplash API 키가 없습니다.")
@@ -44,7 +37,6 @@ def search_unsplash(query, page=1):
     try:
         res = requests.get(url, params=params)
         if res.status_code == 200:
-            # 데이터 포맷 통일
             return [{'id': item['id'], 'source': 'Unsplash', 'urls': {'thumb': item['urls']['thumb'], 'regular': item['urls']['regular']}} for item in res.json()['results']]
     except: pass
     return []
@@ -59,7 +51,7 @@ def search_pexels(query, page=1):
     try:
         res = requests.get(url, headers=headers, params=params)
         if res.status_code == 200:
-            return [{'id': item['id'], 'source': 'Pexels', 'urls': {'thumb': item['src']['tiny'], 'regular': item['src']['large']}} for item in res.json()['photos']]
+            return [{'id': item['id'], 'source': 'Pexels', 'urls': {'thumb': item['src']['tiny'], 'regular': item['src']['portrait']}} for item in res.json()['photos']]
     except: pass
     return []
 
@@ -76,11 +68,9 @@ def search_pixabay(query, page=1):
     except: pass
     return []
 
-
 # ==========================================
 # [함수] 그리기 및 유틸리티
 # ==========================================
-
 def get_font(filename, size):
     try: return ImageFont.truetype(os.path.join(ASSETS_DIR, filename), size)
     except:
@@ -146,6 +136,10 @@ def create_slide(data):
     category = data.get('category', '') 
     keyword = data.get('keyword', '') 
     
+    # [설정] 사용자 지정 글씨 크기 가져오기
+    custom_sub_size = data.get('sub_size', 45) # 표지 부제목 기본값 45
+    custom_body_size = data.get('body_size', 40) # 내용 본문 기본값 40
+
     img = Image.new('RGB', (CANvas_WIDTH, CANvas_HEIGHT), "#1A1A1A")
     draw = ImageDraw.Draw(img)
 
@@ -155,7 +149,6 @@ def create_slide(data):
         bg_img = None
         if bg_source:
             if isinstance(bg_source, str) and bg_source.startswith('http'):
-                # API로 가져온 이미지는 URL임
                 res = requests.get(bg_source)
                 bg_img = Image.open(BytesIO(res.content)).convert('RGB')
                 if "images.unsplash.com" in bg_source: is_unsplash = True
@@ -178,8 +171,11 @@ def create_slide(data):
                     offset_x, offset_y = 0, (new_h - CANvas_HEIGHT) // 2
                 bg_img = bg_img.resize((new_w, new_h), Image.LANCZOS)
                 img.paste(bg_img, (-offset_x, -offset_y))
-                dim = Image.new('RGBA', img.size, (0, 0, 0, 110))
-                img.paste(dim, (0,0), dim)
+                
+                # [수정] 아웃트로(outro)가 아닐 때만 배경 어둡게 처리 (아웃트로는 원본 유지)
+                if data.get('type') != 'outro':
+                    dim = Image.new('RGBA', img.size, (0, 0, 0, 110))
+                    img.paste(dim, (0,0), dim)
     except Exception as e: print(f"배경 에러: {e}")
 
     # 2. 저작권 표시 (Unsplash만)
@@ -195,13 +191,14 @@ def create_slide(data):
     content = data.get('content', '')
 
     font_t_size = 90 if type == 'cover' else 60
-    font_b_size = 45 if type == 'cover' else 40
+    # [수정] 사용자 지정 크기 적용
+    font_b_size = custom_sub_size if type == 'cover' else custom_body_size
+    
     if type == 'outro': font_t_size, font_b_size = 80, 50
 
     font_t = get_font(FONT_TITLE_NAME, font_t_size)
     font_b = get_font(FONT_BODY_NAME, font_b_size)
     
-    # [정렬 핵심] ALIGN_LEFT_X 사용
     margin_x = ALIGN_LEFT_X 
     max_width = CANvas_WIDTH - (margin_x * 2)
 
@@ -215,12 +212,11 @@ def create_slide(data):
 
     current_y = start_y
     
-    # [표지 전용] SYSO MAGAZINE 헤더 (칼각 정렬 적용)
+    # [표지 전용] SYSO MAGAZINE 헤더
     if type == 'cover':
         header_y = start_y - 80 
         font_header = get_font(FONT_TITLE_NAME, 30)
         
-        # SYSO 박스
         syso_text = "SYSO"
         syso_bbox = draw.textbbox((0,0), syso_text, font=font_header)
         syso_w, syso_h = syso_bbox[2] - syso_bbox[0], syso_bbox[3] - syso_bbox[1]
@@ -228,11 +224,8 @@ def create_slide(data):
         box_padding_x, box_padding_y = 10, 5
         box_w = syso_w + (box_padding_x * 2)
         box_h = syso_h + (box_padding_y * 2) + 5
-        
-        # [정렬] 박스 시작점을 ALIGN_LEFT_X로 고정
         box_x = ALIGN_LEFT_X 
         
-        # Knockout 효과
         bg_patch = img.crop((int(box_x), int(header_y), int(box_x + box_w), int(header_y + box_h)))
         mask = Image.new("L", bg_patch.size, 0)
         d_mask = ImageDraw.Draw(mask)
@@ -241,11 +234,10 @@ def create_slide(data):
         draw.rectangle([(box_x, header_y), (box_x + box_w, header_y + box_h)], fill=BRAND_COLOR)
         img.paste(bg_patch, (int(box_x), int(header_y)), mask)
         
-        # MAGAZINE
         mag_text = "MAGAZINE"
         draw.text((box_x + box_w + 10, header_y + box_padding_y - 2), mag_text, font=font_header, fill=BRAND_COLOR)
 
-    # 텍스트 출력 (공통)
+    # 텍스트 출력 로직
     if type == 'cover': # 양각
         for line in title_lines:
             bbox = draw.textbbox((0, 0), line, font=font_t)
@@ -256,7 +248,51 @@ def create_slide(data):
             bbox = draw.textbbox((0, 0), line, font=font_b)
             draw_embossed_text(draw, (margin_x, current_y), line, font=font_b, fill_color=body_color)
             current_y += (bbox[3] - bbox[1]) + 15
-    else: # 일반
+            
+    elif type == 'outro':
+        # [수정] 아웃트로 전용 로직: BALANCE YOUR (KEYWORD) 컬러링 + 중앙 정렬
+        
+        # 1. 아웃트로 메인 텍스트 처리 (BALANCE YOUR ...)
+        full_title = title.strip()
+        
+        # 항상 중앙 정렬 계산 (Layout 무시)
+        # 텍스트 분리: "BALANCE YOUR" 와 나머지 부분
+        prefix = "BALANCE YOUR"
+        
+        if prefix in full_title:
+            remainder = full_title.replace(prefix, "").strip()
+            
+            # 너비 계산
+            w_prefix = draw.textlength(prefix, font=font_t)
+            w_space = draw.textlength(" ", font=font_t)
+            w_remain = draw.textlength(remainder, font=font_t)
+            total_w = w_prefix + w_space + w_remain
+            
+            # 중앙 시작점
+            start_x = (CANvas_WIDTH - total_w) / 2
+            # 높이 계산 (중앙)
+            outro_y = (CANvas_HEIGHT - (font_t_size + 30 + font_b_size)) / 2 - 50 # 약간 위로
+
+            # 그리기
+            draw.text((start_x, outro_y), prefix, font=font_t, fill="#FFFFFF") # 흰색
+            draw.text((start_x + w_prefix + w_space, outro_y), remainder, font=font_t, fill=BRAND_COLOR) # 브랜드 컬러
+            
+            current_y = outro_y + font_t_size + 30
+        else:
+            # BALANCE YOUR가 없는 일반 문구일 경우 그냥 중앙 정렬 흰색
+            w_title = draw.textlength(full_title, font=font_t)
+            start_x = (CANvas_WIDTH - w_title) / 2
+            outro_y = (CANvas_HEIGHT - (font_t_size + 30 + font_b_size)) // 2 - 50
+            draw.text((start_x, outro_y), full_title, font=font_t, fill="#FFFFFF")
+            current_y = outro_y + font_t_size + 30
+
+        # 2. 아웃트로 부제목 (작은 문구) 중앙 정렬
+        if content:
+            w_sub = draw.textlength(content, font=font_b)
+            start_x_sub = (CANvas_WIDTH - w_sub) / 2
+            draw.text((start_x_sub, current_y), content, font=font_b, fill="#DDDDDD")
+
+    else: # 일반 내용 페이지
         for line in title_lines:
             bbox = draw.textbbox((0, 0), line, font=font_t)
             draw.text((margin_x, current_y), line, font=font_t, fill=title_color)
@@ -276,19 +312,16 @@ def create_slide(data):
         logo_y = CANvas_HEIGHT - 100 
         img.paste(logo, (logo_x, logo_y), logo)
         
-        # [표지 전용] 하단 디자인 (칼각 정렬 적용)
+        # [표지 전용] 하단 디자인
         if type == 'cover':
             font_footer = get_font(FONT_TITLE_NAME, 26)
             footer_text_y = logo_y + 25
             
             if category:
-                # [정렬] 카테고리도 ALIGN_LEFT_X에서 시작 (Left Anchor)
-                # 기존 anchor="lm" 대신 좌표 직접 계산하거나 anchor="ls" 사용
                 draw.text((ALIGN_LEFT_X, footer_text_y), category, font=font_footer, fill=title_color, anchor="lm")
             
             if keyword:
                 kw_text = f"#{keyword}" if not keyword.startswith("#") else keyword
-                # 키워드는 우측 정렬 유지 (ALIGN_LEFT_X와 대칭되는 지점)
                 right_margin = ALIGN_LEFT_X
                 draw.text((CANvas_WIDTH - right_margin, footer_text_y), kw_text, font=font_footer, fill=title_color, anchor="rm")
                      
@@ -314,9 +347,7 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
     # A. 멀티 소스 검색
     with c1:
         st.subheader("1. 이미지 검색")
-        # 소스 선택
         source_type = st.radio("검색 소스", ["Unsplash", "Pexels", "Pixabay"], horizontal=True)
-        
         col_s1, col_s2, col_s3 = st.columns([2, 1, 1])
         query = col_s1.text_input("검색어 (영문)", value="aesthetic")
         
@@ -348,7 +379,6 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
             for i, img in enumerate(st.session_state['search_temp']):
                 with scols[i % 4]:
                     st.image(img['urls']['thumb'], use_container_width=True)
-                    # 중복 체크
                     exists = any(x['id'] == img['id'] for x in st.session_state['gallery_images'])
                     if not exists:
                         if st.button("담기", key=f"add_{img['id']}"):
@@ -365,11 +395,10 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
             for uf in uploaded_files:
                 if not any(x.get('name') == uf.name for x in st.session_state['gallery_images']):
                     img_obj = Image.open(uf)
-                    # 통일된 데이터 구조로 저장
                     st.session_state['gallery_images'].append({
                         'id': uf.name, 
                         'source': 'Upload', 
-                        'urls': {'thumb': img_obj, 'regular': uf}, # regular에 파일 객체 저장
+                        'urls': {'thumb': img_obj, 'regular': uf}, 
                         'name': uf.name,
                         'obj': img_obj
                     })
@@ -381,15 +410,12 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
         st.info("이미지가 없습니다.")
     else:
         g_cols = st.columns(8)
-        # [수정된 부분] enumerate를 사용하여 인덱스와 함께 순회
         for idx, img in enumerate(st.session_state['gallery_images']):
             with g_cols[idx % 8]:
                 thumb = img['urls']['thumb']
-                # PIL 이미지인지 URL인지 확인하여 표시
                 if isinstance(thumb, str): st.image(thumb, caption=img['source'])
                 else: st.image(thumb, caption="내 사진")
                 
-                # [기능 추가] 삭제 버튼
                 if st.button("❌ 삭제", key=f"del_{img['id']}_{idx}"):
                     st.session_state['gallery_images'].pop(idx)
                     st.rerun()
@@ -397,7 +423,7 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
 # --- 2. 편집 ---
 st.markdown("---")
 st.header("📝 슬라이드 편집")
-st.caption("💡 페이지 수를 설정해주십시오.")
+st.caption("💡 모든 텍스트는 좌측 기준선에 맞춰 깔끔하게 정렬됩니다.")
 
 num_pages = st.number_input("내용 페이지 수", min_value=1, value=3)
 total_pages = 1 + num_pages + 1
@@ -425,10 +451,14 @@ with tabs[0]:
     t = st.text_area("표지 제목", "제목을\n입력하세요", height=100, key="t_cover")
     c = st.text_area("표지 부제목", "부제목을 입력하세요", height=70, key="c_cover")
     
+    # [수정] 부제목 글씨 크기 조절 슬라이더
+    sub_size = st.slider("부제목 크기", min_value=30, max_value=80, value=45, key="sub_size_cover")
+    
     layout, t_col, b_col, bg = editor_ui("cover")
     st.session_state['slide_configs'][0] = {
         "type": "cover", "title": t, "content": c, "category": category, "keyword": keyword,
-        "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col
+        "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col,
+        "sub_size": sub_size # [추가] 부제목 크기 저장
     }
 
 # (2) 내용
@@ -436,13 +466,25 @@ for i in range(num_pages):
     with tabs[i+1]:
         t = st.text_area(f"소제목 {i+1}", key=f"tt_{i}", height=70)
         c = st.text_area(f"본문 {i+1}", key=f"cc_{i}", height=150)
+        
+        # [수정] 본문 글씨 크기 조절 슬라이더
+        body_size = st.slider(f"본문 크기 {i+1}", min_value=20, max_value=80, value=40, key=f"bs_{i}")
+
         layout, t_col, b_col, bg = editor_ui(f"cont_{i}")
-        st.session_state['slide_configs'][i+1] = {"type": "content", "title": t, "content": c, "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col}
+        st.session_state['slide_configs'][i+1] = {
+            "type": "content", "title": t, "content": c, "bg_source": bg, 
+            "layout": layout, "title_color": t_col, "body_color": b_col,
+            "body_size": body_size # [추가] 본문 크기 저장
+        }
 
 # (3) 아웃트로
 with tabs[-1]:
-    t = st.text_area("마지막 큰 문구", "감사합니다", height=70, key="t_outro")
+    t = st.text_area("마지막 큰 문구", "BALANCE YOUR (LIFE)", height=70, key="t_outro")
     c = st.text_area("마지막 작은 문구 (부제목)", "팔로우 부탁드려요!", height=70, key="c_outro")
+    
+    st.caption("💡 'BALANCE YOUR' 뒤에 오는 단어는 자동으로 브랜드 컬러(#C2FF00)가 적용됩니다.")
+    st.caption("💡 배경 이미지는 원본 밝기 그대로 적용됩니다.")
+    
     layout, t_col, b_col, bg = editor_ui("outro")
     st.session_state['slide_configs'][total_pages-1] = {"type": "outro", "title": t, "content": c, "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col}
 
