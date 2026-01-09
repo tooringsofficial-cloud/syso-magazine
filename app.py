@@ -16,8 +16,8 @@ PIXABAY_API_KEY = "54085998-ef78c84d4ce4500e6d211c19d"
 # [설정] 디자인 상수
 # ==========================================
 ASSETS_DIR = "assets"
-FONT_TITLE_NAME = "NotoSansKR-Bold.ttf"
-FONT_BODY_NAME = "NotoSansKR-Medium.ttf"
+FONT_TITLE_NAME = "Pretendard-ExtraBold.ttf"
+FONT_BODY_NAME = "Pretendard-Bold.ttf"
 
 CANvas_WIDTH = 1080
 CANvas_HEIGHT = 1350
