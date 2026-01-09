@@ -16,8 +16,8 @@ PIXABAY_API_KEY = "54085998-ef78c84d4ce4500e6d211c19d"
 # [설정] 디자인 상수
 # ==========================================
 ASSETS_DIR = "assets"
-FONT_TITLE_NAME = "Pretendard-ExtraBold.ttf"
-FONT_BODY_NAME = "Pretendard-Bold.ttf"
+FONT_TITLE_NAME = "NotoSansKR-Bold.ttf"
+FONT_BODY_NAME = "NotoSansKR-Medium.ttf"
 
 CANvas_WIDTH = 1080
 CANvas_HEIGHT = 1350
@@ -128,9 +128,8 @@ def draw_embossed_text(draw, xy, text, font, fill_color="#FFFFFF"):
     draw.text((x+1, y+1), text, font=font, fill="#333333") 
     draw.text((x, y), text, font=font, fill=fill_color)
 
-# [수정] 말풍선 함수: 둥글기 증가, 볼드체 적용, 꼬리 위치 자동화
+# [수정] 말풍선 함수: 꼬리 상하 반전 로직 추가
 def draw_bubble(draw, text, x, y, font_size=30):
-    # 1. 폰트 변경: 가독성을 위해 Bold체 사용
     font = get_font(FONT_TITLE_NAME, font_size) 
     
     padding = 20
@@ -138,27 +137,36 @@ def draw_bubble(draw, text, x, y, font_size=30):
     w = bbox[2] - bbox[0] + (padding * 2)
     h = bbox[3] - bbox[1] + (padding * 2)
     
-    # 2. 둥글기(Radius) 증가: 20 -> 35
     radius = 35
     draw.rounded_rectangle([(x, y), (x + w, y + h)], radius=radius, fill="#FFFFFF")
     
-    # 텍스트 (검은색)
     draw.text((x + padding, y + padding - 5), text, font=font, fill="#000000")
     
-    # 3. 꼬리 위치 자동 계산 (Dynamic Tail)
-    # 말풍선이 화면의 어디쯤 있는지 비율 계산 (0.0: 왼쪽 끝 ~ 1.0: 오른쪽 끝)
+    # 꼬리 위치 계산 (좌우)
     bubble_center_x = x + (w / 2)
     screen_ratio = bubble_center_x / CANvas_WIDTH
-    
-    # 꼬리의 X 좌표를 비율에 맞춰 이동
-    # 말풍선 너비(w) 내에서 움직이되, 둥근 모서리를 침범하지 않도록 제한(clamp)
     tail_target_x = x + (w * screen_ratio)
     tail_x = max(x + radius + 10, min(tail_target_x, x + w - radius - 10))
     
     tail_w = 20
     tail_h = 15
     
-    draw.polygon([(tail_x - tail_w/2, y + h - 1), (tail_x + tail_w/2, y + h - 1), (tail_x, y + h + tail_h)], fill="#FFFFFF")
+    # [신규] 꼬리 위치 결정 (상하)
+    # 화면 중앙선(CANvas_HEIGHT / 2)보다 위에 있으면 꼬리는 아래로, 밑에 있으면 꼬리는 위로
+    is_upper_half = (y + h/2) < (CANvas_HEIGHT / 2)
+    
+    if is_upper_half:
+        # 꼬리를 아래로 (기존 로직)
+        p1 = (tail_x - tail_w/2, y + h - 1)
+        p2 = (tail_x + tail_w/2, y + h - 1)
+        p3 = (tail_x, y + h + tail_h)
+    else:
+        # 꼬리를 위로 (뒤집기)
+        p1 = (tail_x - tail_w/2, y + 1)
+        p2 = (tail_x + tail_w/2, y + 1)
+        p3 = (tail_x, y - tail_h)
+        
+    draw.polygon([p1, p2, p3], fill="#FFFFFF")
 
 
 def create_slide(data):
@@ -214,7 +222,6 @@ def create_slide(data):
                 bg_img = bg_img.resize((new_w, new_h), Image.LANCZOS)
                 img.paste(bg_img, (-offset_x, -offset_y))
                 
-                # 배경 흐림(Tint) 옵션 적용
                 if use_tint and data.get('type') != 'outro':
                     dim = Image.new('RGBA', img.size, (0, 0, 0, 110))
                     img.paste(dim, (0,0), dim)
