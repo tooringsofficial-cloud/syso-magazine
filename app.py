@@ -300,7 +300,7 @@ def create_slide(data):
             draw_embossed_text(draw, (margin_x, current_y), line, font=font_t, fill_color=title_color)
             current_y += (bbox[3] - bbox[1]) + 20
         
-        # [수정] 부제목 간격 조정 (60 -> 35로 줄여서 살짝 올림)
+        # [수정] 부제목 간격 (35로 유지)
         current_y += 35 
         
         for line in body_lines:
@@ -366,14 +366,16 @@ def create_slide(data):
         logo = Image.open(os.path.join(ASSETS_DIR, "logo.png")).convert("RGBA")
         logo.thumbnail((80, 80))
         logo_x = (CANvas_WIDTH - logo.width) // 2
-        logo_y = CANvas_HEIGHT - 170 
+        
+        # [수정] 로고 위치만 더 내림 (-155 -> -140)
+        logo_y = CANvas_HEIGHT - 140 
         img.paste(logo, (logo_x, logo_y), logo)
         
         if type == 'cover':
             font_footer = get_font(FONT_TITLE_NAME, 26)
             
-            # [수정] 텍스트 위치: 로고와 동일 선상(옆)으로 내림
-            footer_text_y = logo_y + 25 
+            # [수정] 텍스트 위치: 로고와 별개로 고정 (기존 위치 유지: 1350 - 130)
+            footer_text_y = CANvas_HEIGHT - 130 
             
             if category:
                 draw.text((ALIGN_LEFT_X, footer_text_y), category, font=font_footer, fill=title_color, anchor="lm")
