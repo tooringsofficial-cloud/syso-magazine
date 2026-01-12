@@ -182,7 +182,6 @@ def create_slide(data):
     bubble_x = data.get('bubble_x', 540)
     bubble_y = data.get('bubble_y', 500)
     
-    # [신규] 사용자 입력 출처
     user_credit = data.get('credit_text', '').strip()
 
     img = Image.new('RGB', (CANvas_WIDTH, CANvas_HEIGHT), "#1A1A1A")
@@ -220,19 +219,16 @@ def create_slide(data):
                     img.paste(dim, (0,0), dim)
     except Exception as e: print(f"배경 에러: {e}")
 
-    # 2. [수정] 저작권 표시 (자동 감지 vs 수동 입력)
+    # 2. 저작권 표시
     final_credit = ""
     if user_credit:
-        # 사용자가 입력한 값이 있으면 그걸 사용 (예: "abcd")
         final_credit = user_credit
     else:
-        # 입력한 값이 없으면 URL로 자동 감지
         if isinstance(bg_source, str):
             if "unsplash.com" in bg_source: final_credit = "Unsplash"
             elif "pexels.com" in bg_source: final_credit = "Pexels"
             elif "pixabay.com" in bg_source: final_credit = "Pixabay"
     
-    # 표시할 텍스트가 있으면 "Photo by" 붙여서 출력
     if final_credit:
         full_credit_text = f"Photo by {final_credit}"
         font_c = get_font(FONT_BODY_NAME, 20)
@@ -369,12 +365,16 @@ def create_slide(data):
         logo = Image.open(os.path.join(ASSETS_DIR, "logo.png")).convert("RGBA")
         logo.thumbnail((80, 80))
         logo_x = (CANvas_WIDTH - logo.width) // 2
-        logo_y = CANvas_HEIGHT - 100 
+        
+        # [수정] 로고 위치 상향 조정 (기존보다 70px 위로)
+        logo_y = CANvas_HEIGHT - 170 
         img.paste(logo, (logo_x, logo_y), logo)
         
         if type == 'cover':
             font_footer = get_font(FONT_TITLE_NAME, 26)
-            footer_text_y = logo_y + 25
+            
+            # [수정] 텍스트 위치: 로고 위쪽으로 배치 (로고 상승폭의 약 2배 적용)
+            footer_text_y = logo_y - 30 
             
             if category:
                 draw.text((ALIGN_LEFT_X, footer_text_y), category, font=font_footer, fill=title_color, anchor="lm")
@@ -508,7 +508,6 @@ def editor_ui(key, use_slider=False):
     bg_key = st.selectbox("배경 이미지 선택", list(bg_options.keys()), key=f"bg_{key}")
     use_tint = st.checkbox("배경 어둡게 하기 (Tint)", value=True, key=f"tint_{key}")
     
-    # [신규] 출처 기입란
     credit_text = st.text_input("이미지 출처 (예: 작가명)", help="비워두면 Pexels/Unsplash 등은 자동 표기됩니다.", key=f"cr_{key}")
     
     return layout, t_col, b_col, bg_options[bg_key], use_tint, credit_text
