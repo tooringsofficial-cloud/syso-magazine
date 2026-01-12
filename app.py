@@ -128,7 +128,7 @@ def draw_embossed_text(draw, xy, text, font, fill_color="#FFFFFF"):
     draw.text((x+1, y+1), text, font=font, fill="#333333") 
     draw.text((x, y), text, font=font, fill=fill_color)
 
-# [수정] 말풍선 함수: 꼬리 상하 반전 로직 추가
+# 말풍선 함수
 def draw_bubble(draw, text, x, y, font_size=30):
     font = get_font(FONT_TITLE_NAME, font_size) 
     
@@ -142,7 +142,7 @@ def draw_bubble(draw, text, x, y, font_size=30):
     
     draw.text((x + padding, y + padding - 5), text, font=font, fill="#000000")
     
-    # 꼬리 위치 계산 (좌우)
+    # 꼬리 위치 계산
     bubble_center_x = x + (w / 2)
     screen_ratio = bubble_center_x / CANvas_WIDTH
     tail_target_x = x + (w * screen_ratio)
@@ -151,17 +151,13 @@ def draw_bubble(draw, text, x, y, font_size=30):
     tail_w = 20
     tail_h = 15
     
-    # [신규] 꼬리 위치 결정 (상하)
-    # 화면 중앙선(CANvas_HEIGHT / 2)보다 위에 있으면 꼬리는 아래로, 밑에 있으면 꼬리는 위로
     is_upper_half = (y + h/2) < (CANvas_HEIGHT / 2)
     
     if is_upper_half:
-        # 꼬리를 아래로 (기존 로직)
         p1 = (tail_x - tail_w/2, y + h - 1)
         p2 = (tail_x + tail_w/2, y + h - 1)
         p3 = (tail_x, y + h + tail_h)
     else:
-        # 꼬리를 위로 (뒤집기)
         p1 = (tail_x - tail_w/2, y + 1)
         p2 = (tail_x + tail_w/2, y + 1)
         p3 = (tail_x, y - tail_h)
@@ -185,23 +181,20 @@ def create_slide(data):
     bubble_text = data.get('bubble_text', '') 
     bubble_x = data.get('bubble_x', 540)
     bubble_y = data.get('bubble_y', 500)
+    
+    # [신규] 사용자 입력 출처
+    user_credit = data.get('credit_text', '').strip()
 
     img = Image.new('RGB', (CANvas_WIDTH, CANvas_HEIGHT), "#1A1A1A")
     draw = ImageDraw.Draw(img)
 
     # 1. 배경 이미지 합성
-    source_credit = "" 
     try:
         bg_img = None
         if bg_source:
             if isinstance(bg_source, str) and bg_source.startswith('http'):
                 res = requests.get(bg_source)
                 bg_img = Image.open(BytesIO(res.content)).convert('RGB')
-                
-                if "unsplash.com" in bg_source: source_credit = "Photo by Unsplash"
-                elif "pexels.com" in bg_source: source_credit = "Photo by Pexels"
-                elif "pixabay.com" in bg_source: source_credit = "Photo by Pixabay"
-
             elif hasattr(bg_source, 'read'):
                 bg_source.seek(0)
                 bg_img = Image.open(bg_source).convert('RGB')
@@ -227,11 +220,24 @@ def create_slide(data):
                     img.paste(dim, (0,0), dim)
     except Exception as e: print(f"배경 에러: {e}")
 
-    # 2. 저작권 표시
-    if source_credit:
+    # 2. [수정] 저작권 표시 (자동 감지 vs 수동 입력)
+    final_credit = ""
+    if user_credit:
+        # 사용자가 입력한 값이 있으면 그걸 사용 (예: "abcd")
+        final_credit = user_credit
+    else:
+        # 입력한 값이 없으면 URL로 자동 감지
+        if isinstance(bg_source, str):
+            if "unsplash.com" in bg_source: final_credit = "Unsplash"
+            elif "pexels.com" in bg_source: final_credit = "Pexels"
+            elif "pixabay.com" in bg_source: final_credit = "Pixabay"
+    
+    # 표시할 텍스트가 있으면 "Photo by" 붙여서 출력
+    if final_credit:
+        full_credit_text = f"Photo by {final_credit}"
         font_c = get_font(FONT_BODY_NAME, 20)
-        bbox = draw.textbbox((0, 0), source_credit, font=font_c)
-        draw.text((CANvas_WIDTH - bbox[2] - 30, 30), source_credit, font=font_c, fill="#AAAAAA")
+        bbox = draw.textbbox((0, 0), full_credit_text, font=font_c)
+        draw.text((CANvas_WIDTH - bbox[2] - 30, 30), full_credit_text, font=font_c, fill="#AAAAAA")
 
     # 3. 텍스트 그리기 준비
     type = data.get('type', 'content')
@@ -502,7 +508,10 @@ def editor_ui(key, use_slider=False):
     bg_key = st.selectbox("배경 이미지 선택", list(bg_options.keys()), key=f"bg_{key}")
     use_tint = st.checkbox("배경 어둡게 하기 (Tint)", value=True, key=f"tint_{key}")
     
-    return layout, t_col, b_col, bg_options[bg_key], use_tint
+    # [신규] 출처 기입란
+    credit_text = st.text_input("이미지 출처 (예: 작가명)", help="비워두면 Pexels/Unsplash 등은 자동 표기됩니다.", key=f"cr_{key}")
+    
+    return layout, t_col, b_col, bg_options[bg_key], use_tint, credit_text
 
 # (1) 표지
 with tabs[0]:
@@ -519,12 +528,12 @@ with tabs[0]:
         bubble_x = b_c1.slider("가로 위치 (X)", 0, CANvas_WIDTH, 540, key="bub_x_cover")
         bubble_y = b_c2.slider("세로 위치 (Y)", 0, CANvas_HEIGHT, 500, key="bub_y_cover")
     
-    layout, t_col, b_col, bg, use_tint = editor_ui("cover", use_slider=False)
+    layout, t_col, b_col, bg, use_tint, credit_text = editor_ui("cover", use_slider=False)
     
     st.session_state['slide_configs'][0] = {
         "type": "cover", "title": t, "content": c, "category": category, "keyword": keyword,
         "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col,
-        "sub_size": sub_size, "use_tint": use_tint,
+        "sub_size": sub_size, "use_tint": use_tint, "credit_text": credit_text,
         "bubble_text": bubble_text, "bubble_x": bubble_x, "bubble_y": bubble_y
     }
 
@@ -541,12 +550,12 @@ for i in range(num_pages):
             bubble_x = b_c1.slider("가로 위치 (X)", 0, CANvas_WIDTH, 540, key=f"bub_x_{i}")
             bubble_y = b_c2.slider("세로 위치 (Y)", 0, CANvas_HEIGHT, 500, key=f"bub_y_{i}")
 
-        layout, t_col, b_col, bg, use_tint = editor_ui(f"cont_{i}", use_slider=True)
+        layout, t_col, b_col, bg, use_tint, credit_text = editor_ui(f"cont_{i}", use_slider=True)
         
         st.session_state['slide_configs'][i+1] = {
             "type": "content", "title": t, "content": c, "bg_source": bg, 
             "layout": layout, "title_color": t_col, "body_color": b_col,
-            "body_size": body_size, "use_tint": use_tint,
+            "body_size": body_size, "use_tint": use_tint, "credit_text": credit_text,
             "bubble_text": bubble_text, "bubble_x": bubble_x, "bubble_y": bubble_y
         }
 
@@ -557,8 +566,8 @@ with tabs[-1]:
     
     st.caption("💡 아웃트로는 가로 중앙 정렬이 기본이며, 세로 위치는 레이아웃(상/중/하)을 따릅니다.")
     
-    layout, t_col, b_col, bg, _ = editor_ui("outro", use_slider=True)
-    st.session_state['slide_configs'][total_pages-1] = {"type": "outro", "title": t, "content": c, "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col}
+    layout, t_col, b_col, bg, _, credit_text = editor_ui("outro", use_slider=True)
+    st.session_state['slide_configs'][total_pages-1] = {"type": "outro", "title": t, "content": c, "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col, "credit_text": credit_text}
 
 # --- 3. 생성 ---
 st.markdown("---")
