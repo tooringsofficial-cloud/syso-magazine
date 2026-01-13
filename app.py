@@ -300,7 +300,7 @@ def create_slide(data):
             draw_embossed_text(draw, (margin_x, current_y), line, font=font_t, fill_color=title_color)
             current_y += (bbox[3] - bbox[1]) + 20
         
-        # [수정] 부제목 간격 (35로 유지)
+        # 부제목 간격 (35 유지)
         current_y += 35 
         
         for line in body_lines:
@@ -367,15 +367,15 @@ def create_slide(data):
         logo.thumbnail((80, 80))
         logo_x = (CANvas_WIDTH - logo.width) // 2
         
-        # [수정] 로고 위치만 더 내림 (-155 -> -140)
+        # 로고 위치: -140
         logo_y = CANvas_HEIGHT - 140 
         img.paste(logo, (logo_x, logo_y), logo)
         
         if type == 'cover':
             font_footer = get_font(FONT_TITLE_NAME, 26)
             
-            # [수정] 텍스트 위치: 로고와 별개로 고정 (기존 위치 유지: 1350 - 130)
-            footer_text_y = CANvas_HEIGHT - 130 
+            # 텍스트 위치: 로고와 동일 선상(옆)
+            footer_text_y = logo_y + 25 
             
             if category:
                 draw.text((ALIGN_LEFT_X, footer_text_y), category, font=font_footer, fill=title_color, anchor="lm")
@@ -407,9 +407,11 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
     # A. 멀티 소스 검색
     with c1:
         st.subheader("1. 이미지 검색")
-        source_type = st.radio("검색 소스", ["Unsplash", "Pexels", "Pixabay"], horizontal=True)
+        # [수정] 키(Key) 추가로 초기화 방지
+        source_type = st.radio("검색 소스", ["Unsplash", "Pexels", "Pixabay"], horizontal=True, key="search_source")
         col_s1, col_s2, col_s3 = st.columns([2, 1, 1])
-        query = col_s1.text_input("검색어 (영문)", value="aesthetic")
+        # [수정] 키(Key) 추가로 초기화 방지
+        query = col_s1.text_input("검색어 (영문)", value="aesthetic", key="search_query")
         
         if col_s2.button("검색"):
             st.session_state['search_page'] = 1 
@@ -485,7 +487,8 @@ st.markdown("---")
 st.header("📝 슬라이드 편집")
 st.caption("💡 모든 텍스트는 좌측 기준선에 맞춰 깔끔하게 정렬됩니다.")
 
-num_pages = st.number_input("내용 페이지 수", min_value=1, value=3)
+# [수정] 키(Key) 추가로 초기화 방지 (가장 중요)
+num_pages = st.number_input("내용 페이지 수", min_value=1, value=3, key="num_pages_setting")
 total_pages = 1 + num_pages + 1
 tabs = st.tabs(["표지"] + [f"내용 {i+1}" for i in range(num_pages)] + ["아웃트로"])
 
