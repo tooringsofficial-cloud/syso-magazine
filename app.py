@@ -219,7 +219,7 @@ def create_slide(data):
                     img.paste(dim, (0,0), dim)
     except Exception as e: print(f"배경 에러: {e}")
 
-    # 2. 저작권 표시 (에러 수정됨)
+    # 2. 저작권 표시
     final_credit = ""
     if user_credit:
         final_credit = user_credit
@@ -233,7 +233,6 @@ def create_slide(data):
         full_credit_text = f"Photo by {final_credit}"
         font_c = get_font(FONT_BODY_NAME, 20)
         bbox = draw.textbbox((0, 0), full_credit_text, font=font_c)
-        # [수정 완료] font=font_c 로 명시
         draw.text((CANvas_WIDTH - bbox[2] - 30, 30), full_credit_text, font=font_c, fill="#AAAAAA")
 
     # 3. 텍스트 그리기 준비
@@ -259,7 +258,7 @@ def create_slide(data):
     # [설정] Y좌표 및 레이아웃
     start_y = 150 
     if type == 'outro':
-        start_y = 300 # 아웃트로 고정 위치
+        start_y = 300 
     elif type == 'cover':
         if layout_data == '중앙 정렬': start_y = (CANvas_HEIGHT - block_h) // 2
         elif layout_data == '하단 정렬': start_y = CANvas_HEIGHT - block_h - 250
@@ -341,7 +340,8 @@ def create_slide(data):
             start_x = (CANvas_WIDTH - w_title) / 2
             draw.text((start_x, current_outro_y), full_title, font=font_t, fill="#FFFFFF")
         
-        current_outro_y += h_title + 30
+        # [수정 1] 아웃트로 제목과 부제목 사이 간격 대폭 증가 (30 -> 90)
+        current_outro_y += h_title + 90
 
         outro_lines = wrap_text(content, font_b, CANvas_WIDTH - 200, draw)
         if outro_lines:
@@ -382,8 +382,8 @@ def create_slide(data):
         if type == 'cover':
             font_footer = get_font(FONT_TITLE_NAME, 26)
             
-            # 텍스트 위치: -140
-            footer_text_y = CANvas_HEIGHT - 140 
+            # [수정 2] 표지 하단 텍스트 위치 더 내림 (CANvas_HEIGHT - 140 -> CANvas_HEIGHT - 120)
+            footer_text_y = CANvas_HEIGHT - 120 
             
             if category:
                 draw.text((ALIGN_LEFT_X, footer_text_y), category, font=font_footer, fill=title_color, anchor="lm")
@@ -415,10 +415,13 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
     # A. 멀티 소스 검색
     with c1:
         st.subheader("1. 이미지 검색")
+        # [수정] Key 추가
         source_type = st.radio("검색 소스", ["Unsplash", "Pexels", "Pixabay"], horizontal=True, key="search_source")
         col_s1, col_s2, col_s3 = st.columns([2, 1, 1])
+        # [수정] Key 추가
         query = col_s1.text_input("검색어 (영문)", value="aesthetic", key="search_query")
         
+        # [수정] Key 추가
         if col_s2.button("검색", key="btn_search"):
             st.session_state['search_page'] = 1 
             results = []
@@ -429,6 +432,7 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
             if results: st.session_state['search_temp'] = results
             else: st.warning("검색 결과가 없거나 API 키를 확인해주세요.")
         
+        # [수정] Key 추가
         if col_s3.button("더보기", key="btn_more"):
             st.session_state['search_page'] += 1
             new_results = []
@@ -458,6 +462,7 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
     # B. 업로드
     with c2:
         st.subheader("2. 내 이미지 업로드")
+        # [수정] Key 추가 (가장 중요)
         uploaded_files = st.file_uploader("이미지 파일 선택", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True, key="uploader")
         if uploaded_files:
             for uf in uploaded_files:
