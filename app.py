@@ -258,8 +258,8 @@ def create_slide(data):
     # [수정 2] 아웃트로 위치 고정 및 시작 Y좌표 계산
     start_y = 150 
     if type == 'outro':
-        # 아웃트로는 상단(150)과 중앙(약 600) 사이의 고정된 위치 사용
-        start_y = 380 
+        # [수정] 아웃트로 문구 위로 올림 (380 -> 330)
+        start_y = 330 
     elif type == 'cover':
         if layout_data == '중앙 정렬': start_y = (CANvas_HEIGHT - block_h) // 2
         elif layout_data == '하단 정렬': start_y = CANvas_HEIGHT - block_h - 250
@@ -382,9 +382,8 @@ def create_slide(data):
         if type == 'cover':
             font_footer = get_font(FONT_TITLE_NAME, 26)
             
-            # [수정 1] 텍스트 위치: 로고와 연동 해제 및 위로 배치
-            # 기존: logo_y + 25 (약 1235) -> 변경: 고정된 높은 위치 (예: 1190)
-            footer_text_y = CANvas_HEIGHT - 160 
+            # [수정 1] 텍스트 위치 내림 (CANvas_HEIGHT - 160 -> CANvas_HEIGHT - 120)
+            footer_text_y = CANvas_HEIGHT - 120 
             
             if category:
                 draw.text((ALIGN_LEFT_X, footer_text_y), category, font=font_footer, fill=title_color, anchor="lm")
