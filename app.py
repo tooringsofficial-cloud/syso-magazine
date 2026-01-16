@@ -258,8 +258,8 @@ def create_slide(data):
     # [수정 2] 아웃트로 위치 고정 및 시작 Y좌표 계산
     start_y = 150 
     if type == 'outro':
-        # [수정] 아웃트로 문구 위로 올림 (380 -> 330)
-        start_y = 330 
+        # [수정] 아웃트로 문구 위로 조금 더 올림 (330 -> 300)
+        start_y = 300 
     elif type == 'cover':
         if layout_data == '중앙 정렬': start_y = (CANvas_HEIGHT - block_h) // 2
         elif layout_data == '하단 정렬': start_y = CANvas_HEIGHT - block_h - 250
@@ -382,8 +382,8 @@ def create_slide(data):
         if type == 'cover':
             font_footer = get_font(FONT_TITLE_NAME, 26)
             
-            # [수정 1] 텍스트 위치 내림 (CANvas_HEIGHT - 160 -> CANvas_HEIGHT - 120)
-            footer_text_y = CANvas_HEIGHT - 120 
+            # [수정 1] 텍스트 위치 내림 (CANvas_HEIGHT - 120 -> CANvas_HEIGHT - 140)
+            footer_text_y = CANvas_HEIGHT - 140 
             
             if category:
                 draw.text((ALIGN_LEFT_X, footer_text_y), category, font=font_footer, fill=title_color, anchor="lm")
@@ -539,7 +539,7 @@ with tabs[0]:
         bubble_text = st.text_input("말풍선 문구", key="bub_t_cover")
         b_c1, b_c2 = st.columns(2)
         bubble_x = b_c1.slider("가로 위치 (X)", 0, CANvas_WIDTH, 540, key="bub_x_cover")
-        bubble_y = b_c2.slider("세로 위치 (Y)", 0, CANvas_HEIGHT, 500, key="bub_y_cover")
+        bubble_y = b_c2.slider("세로 위치 (Y)", 0, CANvas_HEIGHT, 500, key=f"bub_y_cover")
     
     layout, t_col, b_col, bg, use_tint, credit_text = editor_ui("cover", use_slider=False)
     
@@ -577,7 +577,7 @@ with tabs[-1]:
     t = st.text_area("마지막 큰 문구", "BALANCE YOUR (LIFE)", height=70, key="t_outro")
     c = st.text_area("마지막 작은 문구 (부제목)", "팔로우 부탁드려요!", height=70, key="c_outro")
     
-    st.caption("💡 아웃트로는 가로 중앙 정렬이 기본이며, 세로 위치는 레이아웃(상/중/하)을 따릅니다.")
+    st.caption("💡 (LIFE)를 지우고 알맞은 키워드로 바꿔주세요.")
     
     layout, t_col, b_col, bg, _, credit_text = editor_ui("outro", use_slider=True)
     st.session_state['slide_configs'][total_pages-1] = {"type": "outro", "title": t, "content": c, "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col, "credit_text": credit_text}
