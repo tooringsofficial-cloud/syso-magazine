@@ -340,8 +340,8 @@ def create_slide(data):
             start_x = (CANvas_WIDTH - w_title) / 2
             draw.text((start_x, current_outro_y), full_title, font=font_t, fill="#FFFFFF")
         
-        # [수정 1] 아웃트로 제목과 부제목 사이 간격 대폭 증가 (30 -> 50)
-        current_outro_y += h_title + 50
+        # [수정 1] 아웃트로 제목과 부제목 사이 간격 대폭 증가 (30 -> 60)
+        current_outro_y += h_title + 60
 
         outro_lines = wrap_text(content, font_b, CANvas_WIDTH - 200, draw)
         if outro_lines:
