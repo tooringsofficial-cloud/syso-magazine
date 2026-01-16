@@ -340,8 +340,8 @@ def create_slide(data):
             start_x = (CANvas_WIDTH - w_title) / 2
             draw.text((start_x, current_outro_y), full_title, font=font_t, fill="#FFFFFF")
         
-        # [수정 1] 아웃트로 제목과 부제목 사이 간격 대폭 증가 (30 -> 90)
-        current_outro_y += h_title + 90
+        # [수정 1] 아웃트로 제목과 부제목 사이 간격 대폭 증가 (30 -> 50)
+        current_outro_y += h_title + 50
 
         outro_lines = wrap_text(content, font_b, CANvas_WIDTH - 200, draw)
         if outro_lines:
@@ -382,8 +382,8 @@ def create_slide(data):
         if type == 'cover':
             font_footer = get_font(FONT_TITLE_NAME, 26)
             
-            # [수정 2] 표지 하단 텍스트 위치 더 내림 (CANvas_HEIGHT - 140 -> CANvas_HEIGHT - 120)
-            footer_text_y = CANvas_HEIGHT - 120 
+            # [수정 2] 표지 하단 텍스트 위치 더 내림 (CANvas_HEIGHT - 140 -> CANvas_HEIGHT - 130)
+            footer_text_y = CANvas_HEIGHT - 130 
             
             if category:
                 draw.text((ALIGN_LEFT_X, footer_text_y), category, font=font_footer, fill=title_color, anchor="lm")
