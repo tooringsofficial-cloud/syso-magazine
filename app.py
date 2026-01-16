@@ -199,6 +199,9 @@ def create_slide(data):
                 bg_img = Image.open(bg_source).convert('RGB')
             elif isinstance(bg_source, Image.Image):
                 bg_img = bg_source.convert('RGB')
+            # [수정] 아웃트로 배경 고정: 문자열 경로 처리
+            elif isinstance(bg_source, str) and os.path.exists(bg_source):
+                bg_img = Image.open(bg_source).convert('RGB')
 
             if bg_img:
                 bg_ratio = bg_img.width / bg_img.height
@@ -214,6 +217,7 @@ def create_slide(data):
                 bg_img = bg_img.resize((new_w, new_h), Image.LANCZOS)
                 img.paste(bg_img, (-offset_x, -offset_y))
                 
+                # 아웃트로가 아닐 때만 틴트 적용 (아웃트로는 원본 유지)
                 if use_tint and data.get('type') != 'outro':
                     dim = Image.new('RGBA', img.size, (0, 0, 0, 110))
                     img.paste(dim, (0,0), dim)
@@ -224,7 +228,7 @@ def create_slide(data):
     if user_credit:
         final_credit = user_credit
     else:
-        if isinstance(bg_source, str):
+        if isinstance(bg_source, str) and bg_source.startswith("http"): # 고정 이미지는 제외
             if "unsplash.com" in bg_source: final_credit = "Unsplash"
             elif "pexels.com" in bg_source: final_credit = "Pexels"
             elif "pixabay.com" in bg_source: final_credit = "Pixabay"
@@ -255,21 +259,14 @@ def create_slide(data):
     body_lines = wrap_text(content, font_b, max_width, draw)
     block_h = calculate_text_block_height(draw, title_lines, font_t, body_lines, font_b)
     
-    # [설정] Y좌표 및 레이아웃
     start_y = 150 
-    if type == 'outro':
-        start_y = 300 
-    elif type == 'cover':
+    if type == 'cover':
         if layout_data == '중앙 정렬': start_y = (CANvas_HEIGHT - block_h) // 2
         elif layout_data == '하단 정렬': start_y = CANvas_HEIGHT - block_h - 250
         else: start_y = 150 
-    else: # 일반 콘텐츠
+    else:
         if isinstance(layout_data, int):
             start_y = layout_data
-        elif layout_data == '중앙 정렬':
-            start_y = (CANvas_HEIGHT - block_h) // 2
-        elif layout_data == '하단 정렬':
-            start_y = CANvas_HEIGHT - block_h - 250
         else:
             start_y = 150 
 
@@ -307,8 +304,8 @@ def create_slide(data):
             draw_embossed_text(draw, (margin_x, current_y), line, font=font_t, fill_color=title_color)
             current_y += (bbox[3] - bbox[1]) + 20
         
-        # 부제목 간격
-        current_y += 20
+        # 부제목 간격 (35로 유지)
+        current_y += 35 
         
         for line in body_lines:
             bbox = draw.textbbox((0, 0), line, font=font_b)
@@ -340,8 +337,7 @@ def create_slide(data):
             start_x = (CANvas_WIDTH - w_title) / 2
             draw.text((start_x, current_outro_y), full_title, font=font_t, fill="#FFFFFF")
         
-        # [수정 1] 아웃트로 제목과 부제목 사이 간격 대폭 증가 (30 -> 60)
-        current_outro_y += h_title + 60
+        current_outro_y += h_title + 30
 
         outro_lines = wrap_text(content, font_b, CANvas_WIDTH - 200, draw)
         if outro_lines:
@@ -370,6 +366,7 @@ def create_slide(data):
         draw_bubble(draw, bubble_text, bubble_x, bubble_y)
 
     # 4. 공통 로고 및 하단 (모든 페이지 중앙 하단)
+    # [수정] 아웃트로는 로고 표시 안 함 (이미지에 포함된 경우 등) -> 요청사항엔 없었지만 보통 고정이미지 쓰면 로고 중복될 수 있음. 일단 유지.
     try:
         logo = Image.open(os.path.join(ASSETS_DIR, "logo.png")).convert("RGBA")
         logo.thumbnail((80, 80))
@@ -382,8 +379,8 @@ def create_slide(data):
         if type == 'cover':
             font_footer = get_font(FONT_TITLE_NAME, 26)
             
-            # [수정 2] 표지 하단 텍스트 위치 더 내림 (CANvas_HEIGHT - 140 -> CANvas_HEIGHT - 130)
-            footer_text_y = CANvas_HEIGHT - 130 
+            # 텍스트 위치: 로고와 동일 선상(옆)
+            footer_text_y = logo_y + 25 
             
             if category:
                 draw.text((ALIGN_LEFT_X, footer_text_y), category, font=font_footer, fill=title_color, anchor="lm")
@@ -507,7 +504,7 @@ for i, img in enumerate(st.session_state['gallery_images']):
     label = f"[{img['source']}] 이미지 {i+1}" if img['source'] != 'Upload' else f"[내 사진] {img['name']}"
     bg_options[label] = img['urls']['regular']
 
-def editor_ui(key, use_slider=False):
+def editor_ui(key, use_slider=False, is_outro=False): # [수정] is_outro 파라미터 추가
     c1, c2, c3 = st.columns(3)
     with c1:
         if use_slider:
@@ -519,12 +516,16 @@ def editor_ui(key, use_slider=False):
     with c3: b_col = st.color_picker("본문 색상", "#FFFFFF", key=f"bc_{key}")
     
     st.write("배경 설정:")
-    bg_key = st.selectbox("배경 이미지 선택", list(bg_options.keys()), key=f"bg_{key}")
-    use_tint = st.checkbox("배경 어둡게 하기 (Tint)", value=True, key=f"tint_{key}")
     
-    credit_text = st.text_input("이미지 출처 (예: 작가명)", help="비워두면 Pexels/Unsplash 등은 자동 표기됩니다.", key=f"cr_{key}")
-    
-    return layout, t_col, b_col, bg_options[bg_key], use_tint, credit_text
+    if is_outro:
+        # [수정] 아웃트로는 배경 선택/틴트 옵션 숨기고 고정값 리턴
+        st.info("🖼️ 아웃트로 배경은 'outro.png'로 고정됩니다.")
+        return layout, t_col, b_col, os.path.join(ASSETS_DIR, "outro.png"), False, ""
+    else:
+        bg_key = st.selectbox("배경 이미지 선택", list(bg_options.keys()), key=f"bg_{key}")
+        use_tint = st.checkbox("배경 어둡게 하기 (Tint)", value=True, key=f"tint_{key}")
+        credit_text = st.text_input("이미지 출처 (예: 작가명)", help="비워두면 Pexels/Unsplash 등은 자동 표기됩니다.", key=f"cr_{key}")
+        return layout, t_col, b_col, bg_options[bg_key], use_tint, credit_text
 
 # (1) 표지
 with tabs[0]:
@@ -577,10 +578,15 @@ with tabs[-1]:
     t = st.text_area("마지막 큰 문구", "BALANCE YOUR (LIFE)", height=70, key="t_outro")
     c = st.text_area("마지막 작은 문구 (부제목)", "팔로우 부탁드려요!", height=70, key="c_outro")
     
-    st.caption("💡 (LIFE)를 지우고 알맞은 키워드로 바꿔주세요.")
+    st.caption("💡 아웃트로는 가로 중앙 정렬이 기본이며, 세로 위치는 레이아웃(상/중/하)을 따릅니다.")
     
-    layout, t_col, b_col, bg, _, credit_text = editor_ui("outro", use_slider=True)
-    st.session_state['slide_configs'][total_pages-1] = {"type": "outro", "title": t, "content": c, "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col, "credit_text": credit_text}
+    # [수정] is_outro=True 전달하여 배경 고정
+    layout, t_col, b_col, bg, _, credit_text = editor_ui("outro", use_slider=True, is_outro=True)
+    
+    st.session_state['slide_configs'][total_pages-1] = {
+        "type": "outro", "title": t, "content": c, "bg_source": bg, 
+        "layout": layout, "title_color": t_col, "body_color": b_col, "credit_text": credit_text
+    }
 
 # --- 3. 생성 ---
 st.markdown("---")
