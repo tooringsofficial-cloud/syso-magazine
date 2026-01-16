@@ -233,7 +233,7 @@ def create_slide(data):
         full_credit_text = f"Photo by {final_credit}"
         font_c = get_font(FONT_BODY_NAME, 20)
         bbox = draw.textbbox((0, 0), full_credit_text, font=font_c)
-        draw.text((CANvas_WIDTH - bbox[2] - 30, 30), full_credit_text, font=font_c, fill="#AAAAAA")
+        draw.text((CANvas_WIDTH - bbox[2] - 30, 30), full_credit_text, font_c, fill="#AAAAAA")
 
     # 3. 텍스트 그리기 준비
     type = data.get('type', 'content')
@@ -255,14 +255,22 @@ def create_slide(data):
     body_lines = wrap_text(content, font_b, max_width, draw)
     block_h = calculate_text_block_height(draw, title_lines, font_t, body_lines, font_b)
     
+    # [수정 2] 아웃트로 위치 고정 및 시작 Y좌표 계산
     start_y = 150 
-    if type == 'cover':
+    if type == 'outro':
+        # 아웃트로는 상단(150)과 중앙(약 600) 사이의 고정된 위치 사용
+        start_y = 380 
+    elif type == 'cover':
         if layout_data == '중앙 정렬': start_y = (CANvas_HEIGHT - block_h) // 2
         elif layout_data == '하단 정렬': start_y = CANvas_HEIGHT - block_h - 250
         else: start_y = 150 
-    else:
+    else: # 일반 콘텐츠
         if isinstance(layout_data, int):
             start_y = layout_data
+        elif layout_data == '중앙 정렬':
+            start_y = (CANvas_HEIGHT - block_h) // 2
+        elif layout_data == '하단 정렬':
+            start_y = CANvas_HEIGHT - block_h - 250
         else:
             start_y = 150 
 
@@ -374,8 +382,9 @@ def create_slide(data):
         if type == 'cover':
             font_footer = get_font(FONT_TITLE_NAME, 26)
             
-            # 텍스트 위치: 로고와 동일 선상(옆)
-            footer_text_y = logo_y + 25 
+            # [수정 1] 텍스트 위치: 로고와 연동 해제 및 위로 배치
+            # 기존: logo_y + 25 (약 1235) -> 변경: 고정된 높은 위치 (예: 1190)
+            footer_text_y = CANvas_HEIGHT - 160 
             
             if category:
                 draw.text((ALIGN_LEFT_X, footer_text_y), category, font=font_footer, fill=title_color, anchor="lm")
