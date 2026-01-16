@@ -300,8 +300,8 @@ def create_slide(data):
             draw_embossed_text(draw, (margin_x, current_y), line, font=font_t, fill_color=title_color)
             current_y += (bbox[3] - bbox[1]) + 20
         
-        # 부제목 간격 (35 유지)
-        current_y += 35 
+        # 부제목 간격 (20으로 유지)
+        current_y += 20
         
         for line in body_lines:
             bbox = draw.textbbox((0, 0), line, font=font_b)
@@ -407,13 +407,14 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
     # A. 멀티 소스 검색
     with c1:
         st.subheader("1. 이미지 검색")
-        # [수정] 키(Key) 추가로 초기화 방지
+        # [수정] Key 추가
         source_type = st.radio("검색 소스", ["Unsplash", "Pexels", "Pixabay"], horizontal=True, key="search_source")
         col_s1, col_s2, col_s3 = st.columns([2, 1, 1])
-        # [수정] 키(Key) 추가로 초기화 방지
+        # [수정] Key 추가
         query = col_s1.text_input("검색어 (영문)", value="aesthetic", key="search_query")
         
-        if col_s2.button("검색"):
+        # [수정] Key 추가
+        if col_s2.button("검색", key="btn_search"):
             st.session_state['search_page'] = 1 
             results = []
             if source_type == "Unsplash": results = search_unsplash(query, 1)
@@ -423,7 +424,8 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
             if results: st.session_state['search_temp'] = results
             else: st.warning("검색 결과가 없거나 API 키를 확인해주세요.")
         
-        if col_s3.button("더보기"):
+        # [수정] Key 추가
+        if col_s3.button("더보기", key="btn_more"):
             st.session_state['search_page'] += 1
             new_results = []
             if source_type == "Unsplash": new_results = search_unsplash(query, st.session_state['search_page'])
@@ -452,7 +454,8 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
     # B. 업로드
     with c2:
         st.subheader("2. 내 이미지 업로드")
-        uploaded_files = st.file_uploader("이미지 파일 선택", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
+        # [수정] Key 추가 (가장 중요)
+        uploaded_files = st.file_uploader("이미지 파일 선택", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True, key="uploader")
         if uploaded_files:
             for uf in uploaded_files:
                 if not any(x.get('name') == uf.name for x in st.session_state['gallery_images']):
@@ -461,7 +464,7 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
                         'id': uf.name, 
                         'source': 'Upload', 
                         'urls': {'thumb': img_obj, 'regular': uf}, 
-                        'name': uf.name,
+                        'name': uf.name, 
                         'obj': img_obj
                     })
             
@@ -487,7 +490,6 @@ st.markdown("---")
 st.header("📝 슬라이드 편집")
 st.caption("💡 모든 텍스트는 좌측 기준선에 맞춰 깔끔하게 정렬됩니다.")
 
-# [수정] 키(Key) 추가로 초기화 방지 (가장 중요)
 num_pages = st.number_input("내용 페이지 수", min_value=1, value=3, key="num_pages_setting")
 total_pages = 1 + num_pages + 1
 tabs = st.tabs(["표지"] + [f"내용 {i+1}" for i in range(num_pages)] + ["아웃트로"])
@@ -574,7 +576,8 @@ with tabs[-1]:
 
 # --- 3. 생성 ---
 st.markdown("---")
-if st.button("✨ 이미지 생성 및 다운로드"):
+# [수정] Key 추가
+if st.button("✨ 이미지 생성 및 다운로드", key="btn_generate"):
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, "w") as zf:
         cols = st.columns(min(total_pages, 6))
