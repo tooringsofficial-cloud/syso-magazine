@@ -219,7 +219,7 @@ def create_slide(data):
                     img.paste(dim, (0,0), dim)
     except Exception as e: print(f"배경 에러: {e}")
 
-    # 2. 저작권 표시
+    # 2. 저작권 표시 (에러 수정됨)
     final_credit = ""
     if user_credit:
         final_credit = user_credit
@@ -233,7 +233,8 @@ def create_slide(data):
         full_credit_text = f"Photo by {final_credit}"
         font_c = get_font(FONT_BODY_NAME, 20)
         bbox = draw.textbbox((0, 0), full_credit_text, font=font_c)
-        draw.text((CANvas_WIDTH - bbox[2] - 30, 30), full_credit_text, font_c, fill="#AAAAAA")
+        # [수정 완료] font=font_c 로 명시
+        draw.text((CANvas_WIDTH - bbox[2] - 30, 30), full_credit_text, font=font_c, fill="#AAAAAA")
 
     # 3. 텍스트 그리기 준비
     type = data.get('type', 'content')
@@ -255,11 +256,10 @@ def create_slide(data):
     body_lines = wrap_text(content, font_b, max_width, draw)
     block_h = calculate_text_block_height(draw, title_lines, font_t, body_lines, font_b)
     
-    # [수정 2] 아웃트로 위치 고정 및 시작 Y좌표 계산
+    # [설정] Y좌표 및 레이아웃
     start_y = 150 
     if type == 'outro':
-        # [수정] 아웃트로 문구 위로 조금 더 올림 (330 -> 300)
-        start_y = 300 
+        start_y = 300 # 아웃트로 고정 위치
     elif type == 'cover':
         if layout_data == '중앙 정렬': start_y = (CANvas_HEIGHT - block_h) // 2
         elif layout_data == '하단 정렬': start_y = CANvas_HEIGHT - block_h - 250
@@ -308,7 +308,7 @@ def create_slide(data):
             draw_embossed_text(draw, (margin_x, current_y), line, font=font_t, fill_color=title_color)
             current_y += (bbox[3] - bbox[1]) + 20
         
-        # 부제목 간격 (20으로 유지)
+        # 부제목 간격
         current_y += 20
         
         for line in body_lines:
@@ -382,7 +382,7 @@ def create_slide(data):
         if type == 'cover':
             font_footer = get_font(FONT_TITLE_NAME, 26)
             
-            # [수정 1] 텍스트 위치 내림 (CANvas_HEIGHT - 120 -> CANvas_HEIGHT - 140)
+            # 텍스트 위치: -140
             footer_text_y = CANvas_HEIGHT - 140 
             
             if category:
@@ -415,13 +415,10 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
     # A. 멀티 소스 검색
     with c1:
         st.subheader("1. 이미지 검색")
-        # [수정] Key 추가
         source_type = st.radio("검색 소스", ["Unsplash", "Pexels", "Pixabay"], horizontal=True, key="search_source")
         col_s1, col_s2, col_s3 = st.columns([2, 1, 1])
-        # [수정] Key 추가
         query = col_s1.text_input("검색어 (영문)", value="aesthetic", key="search_query")
         
-        # [수정] Key 추가
         if col_s2.button("검색", key="btn_search"):
             st.session_state['search_page'] = 1 
             results = []
@@ -432,7 +429,6 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
             if results: st.session_state['search_temp'] = results
             else: st.warning("검색 결과가 없거나 API 키를 확인해주세요.")
         
-        # [수정] Key 추가
         if col_s3.button("더보기", key="btn_more"):
             st.session_state['search_page'] += 1
             new_results = []
@@ -462,7 +458,6 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
     # B. 업로드
     with c2:
         st.subheader("2. 내 이미지 업로드")
-        # [수정] Key 추가 (가장 중요)
         uploaded_files = st.file_uploader("이미지 파일 선택", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True, key="uploader")
         if uploaded_files:
             for uf in uploaded_files:
@@ -539,7 +534,7 @@ with tabs[0]:
         bubble_text = st.text_input("말풍선 문구", key="bub_t_cover")
         b_c1, b_c2 = st.columns(2)
         bubble_x = b_c1.slider("가로 위치 (X)", 0, CANvas_WIDTH, 540, key="bub_x_cover")
-        bubble_y = b_c2.slider("세로 위치 (Y)", 0, CANvas_HEIGHT, 500, key=f"bub_y_cover")
+        bubble_y = b_c2.slider("세로 위치 (Y)", 0, CANvas_HEIGHT, 500, key="bub_y_cover")
     
     layout, t_col, b_col, bg, use_tint, credit_text = editor_ui("cover", use_slider=False)
     
