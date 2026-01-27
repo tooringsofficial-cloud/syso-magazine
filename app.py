@@ -183,6 +183,9 @@ def create_slide(data):
     bubble_y = data.get('bubble_y', 500)
     
     user_credit = data.get('credit_text', '').strip()
+    
+    # [수정] 페이지별 선택된 브랜드 컬러 가져오기 (없으면 기본값 사용)
+    page_brand_color = data.get('brand_color', BRAND_COLOR)
 
     img = Image.new('RGB', (CANvas_WIDTH, CANvas_HEIGHT), "#1A1A1A")
     draw = ImageDraw.Draw(img)
@@ -255,21 +258,14 @@ def create_slide(data):
     body_lines = wrap_text(content, font_b, max_width, draw)
     block_h = calculate_text_block_height(draw, title_lines, font_t, body_lines, font_b)
     
-    # [설정] Y좌표 및 레이아웃
     start_y = 150 
-    if type == 'outro':
-        start_y = 300 
-    elif type == 'cover':
+    if type == 'cover':
         if layout_data == '중앙 정렬': start_y = (CANvas_HEIGHT - block_h) // 2
         elif layout_data == '하단 정렬': start_y = CANvas_HEIGHT - block_h - 250
         else: start_y = 150 
-    else: # 일반 콘텐츠
+    else:
         if isinstance(layout_data, int):
             start_y = layout_data
-        elif layout_data == '중앙 정렬':
-            start_y = (CANvas_HEIGHT - block_h) // 2
-        elif layout_data == '하단 정렬':
-            start_y = CANvas_HEIGHT - block_h - 250
         else:
             start_y = 150 
 
@@ -294,11 +290,13 @@ def create_slide(data):
         d_mask = ImageDraw.Draw(mask)
         d_mask.text((box_padding_x, box_padding_y - 2), syso_text, font=font_header, fill=255)
         
-        draw.rectangle([(box_x, header_y), (box_x + box_w, header_y + box_h)], fill=BRAND_COLOR)
+        # [수정] 선택된 브랜드 컬러 적용
+        draw.rectangle([(box_x, header_y), (box_x + box_w, header_y + box_h)], fill=page_brand_color)
         img.paste(bg_patch, (int(box_x), int(header_y)), mask)
         
         mag_text = "MAGAZINE"
-        draw.text((box_x + box_w + 10, header_y + box_padding_y - 2), mag_text, font=font_header, fill=BRAND_COLOR)
+        # [수정] 선택된 브랜드 컬러 적용
+        draw.text((box_x + box_w + 10, header_y + box_padding_y - 2), mag_text, font=font_header, fill=page_brand_color)
 
     # 텍스트 출력 로직
     if type == 'cover': 
@@ -307,7 +305,7 @@ def create_slide(data):
             draw_embossed_text(draw, (margin_x, current_y), line, font=font_t, fill_color=title_color)
             current_y += (bbox[3] - bbox[1]) + 20
         
-        # 부제목 간격
+        # 부제목 간격 (20으로 유지)
         current_y += 20
         
         for line in body_lines:
@@ -334,14 +332,14 @@ def create_slide(data):
             start_x = (CANvas_WIDTH - total_w) / 2
             
             draw.text((start_x, current_outro_y), prefix, font=font_t, fill="#FFFFFF") 
-            draw.text((start_x + w_prefix + w_space, current_outro_y), remainder, font=font_t, fill=BRAND_COLOR) 
+            # [수정] 선택된 브랜드 컬러 적용
+            draw.text((start_x + w_prefix + w_space, current_outro_y), remainder, font=font_t, fill=page_brand_color) 
         else:
             w_title = draw.textlength(full_title, font=font_t)
             start_x = (CANvas_WIDTH - w_title) / 2
             draw.text((start_x, current_outro_y), full_title, font=font_t, fill="#FFFFFF")
         
-        # [수정 1] 아웃트로 제목과 부제목 사이 간격 대폭 증가 (30 -> 60)
-        current_outro_y += h_title + 60
+        current_outro_y += h_title + 30
 
         outro_lines = wrap_text(content, font_b, CANvas_WIDTH - 200, draw)
         if outro_lines:
@@ -382,8 +380,8 @@ def create_slide(data):
         if type == 'cover':
             font_footer = get_font(FONT_TITLE_NAME, 26)
             
-            # [수정 2] 표지 하단 텍스트 위치 더 내림 (CANvas_HEIGHT - 140 -> CANvas_HEIGHT - 130)
-            footer_text_y = CANvas_HEIGHT - 130 
+            # 텍스트 위치: 로고와 동일 선상(옆)
+            footer_text_y = logo_y + 25 
             
             if category:
                 draw.text((ALIGN_LEFT_X, footer_text_y), category, font=font_footer, fill=title_color, anchor="lm")
@@ -535,6 +533,10 @@ with tabs[0]:
     c = st.text_area("표지 부제목", "부제목을 입력하세요", height=70, key="c_cover")
     sub_size = st.slider("부제목 크기", min_value=30, max_value=80, value=45, key="sub_size_cover")
     
+    # [수정] 표지 로고 색상 선택 옵션 추가
+    brand_color_choice = st.radio("로고 포인트 색상", ["#C2FF00 (기본)", "#FFD400 (노랑)"], horizontal=True, key="color_cover")
+    selected_brand_color = "#C2FF00" if "C2FF00" in brand_color_choice else "#FFD400"
+
     with st.expander("💬 말풍선 추가 (옵션)"):
         bubble_text = st.text_input("말풍선 문구", key="bub_t_cover")
         b_c1, b_c2 = st.columns(2)
@@ -547,7 +549,8 @@ with tabs[0]:
         "type": "cover", "title": t, "content": c, "category": category, "keyword": keyword,
         "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col,
         "sub_size": sub_size, "use_tint": use_tint, "credit_text": credit_text,
-        "bubble_text": bubble_text, "bubble_x": bubble_x, "bubble_y": bubble_y
+        "bubble_text": bubble_text, "bubble_x": bubble_x, "bubble_y": bubble_y,
+        "brand_color": selected_brand_color # 색상 저장
     }
 
 # (2) 내용
@@ -579,8 +582,16 @@ with tabs[-1]:
     
     st.caption("💡 (LIFE)를 지우고 알맞은 키워드로 바꿔주세요.")
     
+    # [수정] 아웃트로 포인트 색상 선택 옵션 추가
+    brand_color_choice_outro = st.radio("키워드 포인트 색상", ["#C2FF00 (기본)", "#FFD400 (노랑)"], horizontal=True, key="color_outro")
+    selected_brand_color_outro = "#C2FF00" if "C2FF00" in brand_color_choice_outro else "#FFD400"
+
     layout, t_col, b_col, bg, _, credit_text = editor_ui("outro", use_slider=True)
-    st.session_state['slide_configs'][total_pages-1] = {"type": "outro", "title": t, "content": c, "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col, "credit_text": credit_text}
+    st.session_state['slide_configs'][total_pages-1] = {
+        "type": "outro", "title": t, "content": c, "bg_source": bg, 
+        "layout": layout, "title_color": t_col, "body_color": b_col, "credit_text": credit_text,
+        "brand_color": selected_brand_color_outro # 색상 저장
+    }
 
 # --- 3. 생성 ---
 st.markdown("---")
