@@ -176,6 +176,8 @@ def create_slide(data):
     
     custom_sub_size = data.get('sub_size', 45) 
     custom_body_size = data.get('body_size', 40) 
+    # [신규] 표지 제목 크기 가져오기
+    custom_title_size = data.get('title_size', 90)
     
     use_tint = data.get('use_tint', True) 
     bubble_text = data.get('bubble_text', '') 
@@ -184,7 +186,6 @@ def create_slide(data):
     
     user_credit = data.get('credit_text', '').strip()
     
-    # [수정] 페이지별 선택된 브랜드 컬러 가져오기 (없으면 기본값 사용)
     page_brand_color = data.get('brand_color', BRAND_COLOR)
 
     img = Image.new('RGB', (CANvas_WIDTH, CANvas_HEIGHT), "#1A1A1A")
@@ -243,10 +244,15 @@ def create_slide(data):
     title = data.get('title', '')
     content = data.get('content', '')
 
-    font_t_size = 90 if type == 'cover' else 60
-    font_b_size = custom_sub_size if type == 'cover' else custom_body_size
-    
-    if type == 'outro': font_t_size, font_b_size = 80, 50
+    # [수정] 표지 제목 크기 적용 로직
+    if type == 'cover':
+        font_t_size = custom_title_size # 슬라이더 값 적용
+        font_b_size = custom_sub_size
+    elif type == 'outro':
+        font_t_size, font_b_size = 80, 50
+    else: # content
+        font_t_size = 60
+        font_b_size = custom_body_size
 
     font_t = get_font(FONT_TITLE_NAME, font_t_size)
     font_b = get_font(FONT_BODY_NAME, font_b_size)
@@ -290,12 +296,10 @@ def create_slide(data):
         d_mask = ImageDraw.Draw(mask)
         d_mask.text((box_padding_x, box_padding_y - 2), syso_text, font=font_header, fill=255)
         
-        # [수정] 선택된 브랜드 컬러 적용
         draw.rectangle([(box_x, header_y), (box_x + box_w, header_y + box_h)], fill=page_brand_color)
         img.paste(bg_patch, (int(box_x), int(header_y)), mask)
         
         mag_text = "MAGAZINE"
-        # [수정] 선택된 브랜드 컬러 적용
         draw.text((box_x + box_w + 10, header_y + box_padding_y - 2), mag_text, font=font_header, fill=page_brand_color)
 
     # 텍스트 출력 로직
@@ -332,7 +336,6 @@ def create_slide(data):
             start_x = (CANvas_WIDTH - total_w) / 2
             
             draw.text((start_x, current_outro_y), prefix, font=font_t, fill="#FFFFFF") 
-            # [수정] 선택된 브랜드 컬러 적용
             draw.text((start_x + w_prefix + w_space, current_outro_y), remainder, font=font_t, fill=page_brand_color) 
         else:
             w_title = draw.textlength(full_title, font=font_t)
@@ -531,6 +534,9 @@ with tabs[0]:
     
     t = st.text_area("표지 제목", "제목을\n입력하세요", height=100, key="t_cover")
     c = st.text_area("표지 부제목", "부제목을 입력하세요", height=70, key="c_cover")
+    
+    # [신규] 표지 제목 크기 조절 슬라이더 추가
+    title_size = st.slider("제목 크기", min_value=40, max_value=150, value=90, key="title_size_cover")
     sub_size = st.slider("부제목 크기", min_value=30, max_value=80, value=45, key="sub_size_cover")
     
     # [수정] 표지 로고 색상 선택 옵션 추가 (색상 변경: #Ffeb2e, #BDBBEC 추가)
@@ -552,7 +558,8 @@ with tabs[0]:
         "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col,
         "sub_size": sub_size, "use_tint": use_tint, "credit_text": credit_text,
         "bubble_text": bubble_text, "bubble_x": bubble_x, "bubble_y": bubble_y,
-        "brand_color": selected_brand_color # 색상 저장
+        "brand_color": selected_brand_color, # 색상 저장
+        "title_size": title_size # [신규] 제목 크기 저장
     }
 
 # (2) 내용
