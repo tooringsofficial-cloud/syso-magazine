@@ -533,9 +533,11 @@ with tabs[0]:
     c = st.text_area("표지 부제목", "부제목을 입력하세요", height=70, key="c_cover")
     sub_size = st.slider("부제목 크기", min_value=30, max_value=80, value=45, key="sub_size_cover")
     
-    # [수정] 표지 로고 색상 선택 옵션 추가 (색상 변경: #Ffeb2e)
-    brand_color_choice = st.radio("로고 포인트 색상", ["#C2FF00 (기본)", "#Ffeb2e (노랑)"], horizontal=True, key="color_cover")
-    selected_brand_color = "#C2FF00" if "C2FF00" in brand_color_choice else "#Ffeb2e"
+    # [수정] 표지 로고 색상 선택 옵션 추가 (색상 변경: #Ffeb2e, #BDBBEC 추가)
+    brand_color_choice = st.radio("로고 포인트 색상", ["#C2FF00 (기본)", "#Ffeb2e (노랑)", "#BDBBEC (연보라)"], horizontal=True, key="color_cover")
+    if "C2FF00" in brand_color_choice: selected_brand_color = "#C2FF00"
+    elif "Ffeb2e" in brand_color_choice: selected_brand_color = "#Ffeb2e"
+    else: selected_brand_color = "#BDBBEC"
 
     with st.expander("💬 말풍선 추가 (옵션)"):
         bubble_text = st.text_input("말풍선 문구", key="bub_t_cover")
@@ -582,9 +584,11 @@ with tabs[-1]:
     
     st.caption("💡 (LIFE)를 지우고 알맞은 키워드로 바꿔주세요.")
     
-    # [수정] 아웃트로 포인트 색상 선택 옵션 추가 (색상 변경: #Ffeb2e)
-    brand_color_choice_outro = st.radio("키워드 포인트 색상", ["#C2FF00 (기본)", "#Ffeb2e (노랑)"], horizontal=True, key="color_outro")
-    selected_brand_color_outro = "#C2FF00" if "C2FF00" in brand_color_choice_outro else "#Ffeb2e"
+    # [수정] 아웃트로 포인트 색상 선택 옵션 추가 (색상 변경: #Ffeb2e, #BDBBEC 추가)
+    brand_color_choice_outro = st.radio("키워드 포인트 색상", ["#C2FF00 (기본)", "#Ffeb2e (노랑)", "#BDBBEC (연보라)"], horizontal=True, key="color_outro")
+    if "C2FF00" in brand_color_choice_outro: selected_brand_color_outro = "#C2FF00"
+    elif "Ffeb2e" in brand_color_choice_outro: selected_brand_color_outro = "#Ffeb2e"
+    else: selected_brand_color_outro = "#BDBBEC"
 
     layout, t_col, b_col, bg, _, credit_text = editor_ui("outro", use_slider=True)
     st.session_state['slide_configs'][total_pages-1] = {
