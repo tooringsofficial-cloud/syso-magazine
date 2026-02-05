@@ -22,6 +22,7 @@ FONT_BODY_NAME = "Pretendard-Bold.ttf"
 CANvas_WIDTH = 1080
 CANvas_HEIGHT = 1350
 BRAND_COLOR = "#C2FF00" 
+HIGHLIGHT_COLOR = "#BDBBEC" # [신규] 하이라이트 색상
 
 ALIGN_LEFT_X = 80 
 
@@ -79,6 +80,8 @@ def get_font(filename, size):
 
 def wrap_text(text, font, max_width, draw):
     if not text: return []
+    # * 기호는 길이 계산에서 제외하는 것이 정확하지만, 
+    # 간단한 구현을 위해 * 포함 길이로 계산하되 넉넉하게 래핑됨.
     final_lines = []
     paragraphs = text.split('\n')
     for paragraph in paragraphs:
@@ -91,6 +94,7 @@ def wrap_text(text, font, max_width, draw):
             continue
         current_line = words[0]
         for word in words[1:]:
+            # 임시로 * 제거하고 길이 측정할 수도 있으나, 복잡도 줄이기 위해 그냥 측정
             bbox = draw.textbbox((0, 0), current_line + " " + word, font=font)
             if (bbox[2] - bbox[0]) <= max_width:
                 current_line += " " + word
@@ -103,12 +107,15 @@ def wrap_text(text, font, max_width, draw):
 def calculate_text_block_height(draw, title_lines, font_t, body_lines, font_b):
     total_h = 0
     for line in title_lines:
-        bbox = draw.textbbox((0, 0), line, font=font_t)
+        # 높이 계산 시 * 제거한 순수 텍스트로 측정
+        clean_line = line.replace('*', '')
+        bbox = draw.textbbox((0, 0), clean_line, font=font_t)
         total_h += (bbox[3] - bbox[1]) + 20
     if body_lines:
         total_h += 30 
         for line in body_lines:
-            bbox = draw.textbbox((0, 0), line, font=font_b)
+            clean_line = line.replace('*', '')
+            bbox = draw.textbbox((0, 0), clean_line, font=font_b)
             total_h += (bbox[3] - bbox[1]) + 15
     return total_h
 
@@ -127,6 +134,37 @@ def draw_embossed_text(draw, xy, text, font, fill_color="#FFFFFF"):
     draw.text((x+3, y+3), text, font=font, fill="#000000") 
     draw.text((x+1, y+1), text, font=font, fill="#333333") 
     draw.text((x, y), text, font=font, fill=fill_color)
+
+# [신규] 하이라이트 기능이 포함된 텍스트 그리기 함수
+def draw_line_with_highlight(draw, x, y, text, font, text_color, is_embossed=False):
+    # *로 텍스트 분리 (예: "안녕 *하세요* 반가워" -> ["안녕 ", "하세요", " 반가워"])
+    parts = text.split('*')
+    current_x = x
+    
+    for i, part in enumerate(parts):
+        if not part: continue
+        
+        # 해당 조각의 길이 측정
+        len_w = draw.textlength(part, font=font)
+        
+        # 홀수 인덱스(1, 3, 5...)는 * 사이의 텍스트이므로 하이라이트 처리
+        if i % 2 == 1:
+            # 폰트 높이 대략 계산 (ascent/descent 고려)
+            font_size = font.size
+            # 하이라이트 박스 그리기 (글자 뒤에)
+            # y위치를 폰트 사이즈 기반으로 살짝 조정 (형광펜 느낌)
+            rect_y1 = y + (font_size * 0.2) 
+            rect_y2 = y + (font_size * 1.1)
+            draw.rectangle([(current_x, rect_y1), (current_x + len_w, rect_y2)], fill=HIGHLIGHT_COLOR)
+        
+        # 글자 그리기
+        if is_embossed:
+            draw_embossed_text(draw, (current_x, y), part, font, text_color)
+        else:
+            draw.text((current_x, y), part, font=font, fill=text_color)
+        
+        # 다음 조각을 위해 x 좌표 이동
+        current_x += len_w
 
 # 말풍선 함수
 def draw_bubble(draw, text, x, y, font_size=30):
@@ -176,7 +214,7 @@ def create_slide(data):
     
     custom_sub_size = data.get('sub_size', 45) 
     custom_body_size = data.get('body_size', 40) 
-    # [신규] 표지 제목 크기 가져오기
+    # 표지 제목 크기
     custom_title_size = data.get('title_size', 90)
     
     use_tint = data.get('use_tint', True) 
@@ -203,6 +241,9 @@ def create_slide(data):
                 bg_img = Image.open(bg_source).convert('RGB')
             elif isinstance(bg_source, Image.Image):
                 bg_img = bg_source.convert('RGB')
+            # 아웃트로 고정 이미지 처리
+            elif isinstance(bg_source, str) and os.path.exists(bg_source):
+                bg_img = Image.open(bg_source).convert('RGB')
 
             if bg_img:
                 bg_ratio = bg_img.width / bg_img.height
@@ -228,7 +269,7 @@ def create_slide(data):
     if user_credit:
         final_credit = user_credit
     else:
-        if isinstance(bg_source, str):
+        if isinstance(bg_source, str) and bg_source.startswith("http"):
             if "unsplash.com" in bg_source: final_credit = "Unsplash"
             elif "pexels.com" in bg_source: final_credit = "Pexels"
             elif "pixabay.com" in bg_source: final_credit = "Pixabay"
@@ -244,13 +285,12 @@ def create_slide(data):
     title = data.get('title', '')
     content = data.get('content', '')
 
-    # [수정] 표지 제목 크기 적용 로직
     if type == 'cover':
-        font_t_size = custom_title_size # 슬라이더 값 적용
+        font_t_size = custom_title_size
         font_b_size = custom_sub_size
     elif type == 'outro':
         font_t_size, font_b_size = 80, 50
-    else: # content
+    else: 
         font_t_size = 60
         font_b_size = custom_body_size
 
@@ -302,19 +342,20 @@ def create_slide(data):
         mag_text = "MAGAZINE"
         draw.text((box_x + box_w + 10, header_y + box_padding_y - 2), mag_text, font=font_header, fill=page_brand_color)
 
-    # 텍스트 출력 로직
+    # 텍스트 출력 로직 (하이라이트 기능 적용)
     if type == 'cover': 
         for line in title_lines:
-            bbox = draw.textbbox((0, 0), line, font=font_t)
-            draw_embossed_text(draw, (margin_x, current_y), line, font=font_t, fill_color=title_color)
+            bbox = draw.textbbox((0, 0), line.replace('*', ''), font=font_t)
+            # [수정] 하이라이트 함수 사용 (양각 효과 포함)
+            draw_line_with_highlight(draw, margin_x, current_y, line, font_t, title_color, is_embossed=True)
             current_y += (bbox[3] - bbox[1]) + 20
         
-        # 부제목 간격 (20으로 유지)
         current_y += 20
         
         for line in body_lines:
-            bbox = draw.textbbox((0, 0), line, font=font_b)
-            draw_embossed_text(draw, (margin_x, current_y), line, font=font_b, fill_color=body_color)
+            bbox = draw.textbbox((0, 0), line.replace('*', ''), font=font_b)
+            # [수정] 하이라이트 함수 사용 (양각 효과 포함)
+            draw_line_with_highlight(draw, margin_x, current_y, line, font_b, body_color, is_embossed=True)
             current_y += (bbox[3] - bbox[1]) + 15
             
     elif type == 'outro':
@@ -356,14 +397,16 @@ def create_slide(data):
 
     else: # 일반 내용 페이지
         for line in title_lines:
-            bbox = draw.textbbox((0, 0), line, font=font_t)
-            draw.text((margin_x, current_y), line, font=font_t, fill=title_color)
+            bbox = draw.textbbox((0, 0), line.replace('*', ''), font=font_t)
+            # [수정] 하이라이트 함수 사용 (일반 텍스트)
+            draw_line_with_highlight(draw, margin_x, current_y, line, font_t, title_color, is_embossed=False)
             current_y += (bbox[3] - bbox[1]) + 20
         if body_lines:
             current_y += 30 
             for line in body_lines:
-                bbox = draw.textbbox((0, 0), line, font=font_b)
-                draw.text((margin_x, current_y), line, font=font_b, fill=body_color)
+                bbox = draw.textbbox((0, 0), line.replace('*', ''), font=font_b)
+                # [수정] 하이라이트 함수 사용 (일반 텍스트)
+                draw_line_with_highlight(draw, margin_x, current_y, line, font_b, body_color, is_embossed=False)
                 current_y += (bbox[3] - bbox[1]) + 15
 
     # [말풍선 그리기]
@@ -376,15 +419,13 @@ def create_slide(data):
         logo.thumbnail((80, 80))
         logo_x = (CANvas_WIDTH - logo.width) // 2
         
-        # 로고 위치: -140
         logo_y = CANvas_HEIGHT - 140 
         img.paste(logo, (logo_x, logo_y), logo)
         
         if type == 'cover':
             font_footer = get_font(FONT_TITLE_NAME, 26)
             
-            # 텍스트 위치: 로고와 동일 선상(옆)
-            footer_text_y = logo_y + 10 
+            footer_text_y = CANvas_HEIGHT - 130 
             
             if category:
                 draw.text((ALIGN_LEFT_X, footer_text_y), category, font=font_footer, fill=title_color, anchor="lm")
@@ -497,7 +538,7 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
 # --- 2. 편집 ---
 st.markdown("---")
 st.header("📝 슬라이드 편집")
-st.caption("💡 모든 텍스트는 좌측 기준선에 맞춰 깔끔하게 정렬됩니다.")
+st.caption("💡 모든 텍스트는 좌측 기준선에 맞춰 깔끔하게 정렬됩니다. **강조하고 싶은 단어 양옆에 *(별표)를 붙여보세요!**")
 
 num_pages = st.number_input("내용 페이지 수", min_value=1, value=3, key="num_pages_setting")
 total_pages = 1 + num_pages + 1
@@ -508,7 +549,7 @@ for i, img in enumerate(st.session_state['gallery_images']):
     label = f"[{img['source']}] 이미지 {i+1}" if img['source'] != 'Upload' else f"[내 사진] {img['name']}"
     bg_options[label] = img['urls']['regular']
 
-def editor_ui(key, use_slider=False):
+def editor_ui(key, use_slider=False, is_outro=False): 
     c1, c2, c3 = st.columns(3)
     with c1:
         if use_slider:
@@ -520,22 +561,24 @@ def editor_ui(key, use_slider=False):
     with c3: b_col = st.color_picker("본문 색상", "#FFFFFF", key=f"bc_{key}")
     
     st.write("배경 설정:")
-    bg_key = st.selectbox("배경 이미지 선택", list(bg_options.keys()), key=f"bg_{key}")
-    use_tint = st.checkbox("배경 어둡게 하기 (Tint)", value=True, key=f"tint_{key}")
     
-    credit_text = st.text_input("이미지 출처 (예: 작가명)", help="비워두면 Pexels/Unsplash 등은 자동 표기됩니다.", key=f"cr_{key}")
-    
-    return layout, t_col, b_col, bg_options[bg_key], use_tint, credit_text
+    if is_outro:
+        st.info("🖼️ 아웃트로 배경은 'outro.png'로 고정됩니다.")
+        return layout, t_col, b_col, os.path.join(ASSETS_DIR, "outro.png"), False, ""
+    else:
+        bg_key = st.selectbox("배경 이미지 선택", list(bg_options.keys()), key=f"bg_{key}")
+        use_tint = st.checkbox("배경 어둡게 하기 (Tint)", value=True, key=f"tint_{key}")
+        credit_text = st.text_input("이미지 출처 (예: 작가명)", help="비워두면 Pexels/Unsplash 등은 자동 표기됩니다.", key=f"cr_{key}")
+        return layout, t_col, b_col, bg_options[bg_key], use_tint, credit_text
 
 # (1) 표지
 with tabs[0]:
     category = st.selectbox("주제 (Category)", ["DAY BALANCE", "NIGHT BALANCE", "LIVE BALANCE"], key="cat_cover")
     keyword = st.text_input("하단 키워드 (예: 붓기)", key="kw_cover")
     
-    t = st.text_area("표지 제목", "제목을\n입력하세요", height=100, key="t_cover")
+    t = st.text_area("표지 제목", "제목을\n입력하세요 (강조: *단어*)", height=100, key="t_cover")
     c = st.text_area("표지 부제목", "부제목을 입력하세요", height=70, key="c_cover")
     
-    # [신규] 표지 제목 크기 조절 슬라이더 추가
     title_size = st.slider("제목 크기", min_value=40, max_value=150, value=90, key="title_size_cover")
     sub_size = st.slider("부제목 크기", min_value=30, max_value=80, value=45, key="sub_size_cover")
     
@@ -559,7 +602,7 @@ with tabs[0]:
         "sub_size": sub_size, "use_tint": use_tint, "credit_text": credit_text,
         "bubble_text": bubble_text, "bubble_x": bubble_x, "bubble_y": bubble_y,
         "brand_color": selected_brand_color, # 색상 저장
-        "title_size": title_size # [신규] 제목 크기 저장
+        "title_size": title_size 
     }
 
 # (2) 내용
@@ -597,7 +640,7 @@ with tabs[-1]:
     elif "Ffeb2e" in brand_color_choice_outro: selected_brand_color_outro = "#Ffeb2e"
     else: selected_brand_color_outro = "#BDBBEC"
 
-    layout, t_col, b_col, bg, _, credit_text = editor_ui("outro", use_slider=True)
+    layout, t_col, b_col, bg, _, credit_text = editor_ui("outro", use_slider=True, is_outro=True)
     st.session_state['slide_configs'][total_pages-1] = {
         "type": "outro", "title": t, "content": c, "bg_source": bg, 
         "layout": layout, "title_color": t_col, "body_color": b_col, "credit_text": credit_text,
