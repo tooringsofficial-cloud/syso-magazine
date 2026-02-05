@@ -22,7 +22,7 @@ FONT_BODY_NAME = "Pretendard-Bold.ttf"
 CANvas_WIDTH = 1080
 CANvas_HEIGHT = 1350
 BRAND_COLOR = "#C2FF00" 
-HIGHLIGHT_COLOR = "#BDBBEC" # [신규] 하이라이트 색상
+HIGHLIGHT_COLOR = "#BDBBEC" 
 
 ALIGN_LEFT_X = 80 
 
@@ -80,8 +80,6 @@ def get_font(filename, size):
 
 def wrap_text(text, font, max_width, draw):
     if not text: return []
-    # * 기호는 길이 계산에서 제외하는 것이 정확하지만, 
-    # 간단한 구현을 위해 * 포함 길이로 계산하되 넉넉하게 래핑됨.
     final_lines = []
     paragraphs = text.split('\n')
     for paragraph in paragraphs:
@@ -94,7 +92,6 @@ def wrap_text(text, font, max_width, draw):
             continue
         current_line = words[0]
         for word in words[1:]:
-            # 임시로 * 제거하고 길이 측정할 수도 있으나, 복잡도 줄이기 위해 그냥 측정
             bbox = draw.textbbox((0, 0), current_line + " " + word, font=font)
             if (bbox[2] - bbox[0]) <= max_width:
                 current_line += " " + word
@@ -107,7 +104,6 @@ def wrap_text(text, font, max_width, draw):
 def calculate_text_block_height(draw, title_lines, font_t, body_lines, font_b):
     total_h = 0
     for line in title_lines:
-        # 높이 계산 시 * 제거한 순수 텍스트로 측정
         clean_line = line.replace('*', '')
         bbox = draw.textbbox((0, 0), clean_line, font=font_t)
         total_h += (bbox[3] - bbox[1]) + 20
@@ -135,35 +131,26 @@ def draw_embossed_text(draw, xy, text, font, fill_color="#FFFFFF"):
     draw.text((x+1, y+1), text, font=font, fill="#333333") 
     draw.text((x, y), text, font=font, fill=fill_color)
 
-# [신규] 하이라이트 기능이 포함된 텍스트 그리기 함수
 def draw_line_with_highlight(draw, x, y, text, font, text_color, is_embossed=False):
-    # *로 텍스트 분리 (예: "안녕 *하세요* 반가워" -> ["안녕 ", "하세요", " 반가워"])
     parts = text.split('*')
     current_x = x
     
     for i, part in enumerate(parts):
         if not part: continue
         
-        # 해당 조각의 길이 측정
         len_w = draw.textlength(part, font=font)
         
-        # 홀수 인덱스(1, 3, 5...)는 * 사이의 텍스트이므로 하이라이트 처리
         if i % 2 == 1:
-            # 폰트 높이 대략 계산 (ascent/descent 고려)
             font_size = font.size
-            # 하이라이트 박스 그리기 (글자 뒤에)
-            # y위치를 폰트 사이즈 기반으로 살짝 조정 (형광펜 느낌)
             rect_y1 = y + (font_size * 0.2) 
             rect_y2 = y + (font_size * 1.1)
             draw.rectangle([(current_x, rect_y1), (current_x + len_w, rect_y2)], fill=HIGHLIGHT_COLOR)
         
-        # 글자 그리기
         if is_embossed:
             draw_embossed_text(draw, (current_x, y), part, font, text_color)
         else:
             draw.text((current_x, y), part, font=font, fill=text_color)
         
-        # 다음 조각을 위해 x 좌표 이동
         current_x += len_w
 
 # 말풍선 함수
@@ -346,7 +333,6 @@ def create_slide(data):
     if type == 'cover': 
         for line in title_lines:
             bbox = draw.textbbox((0, 0), line.replace('*', ''), font=font_t)
-            # [수정] 하이라이트 함수 사용 (양각 효과 포함)
             draw_line_with_highlight(draw, margin_x, current_y, line, font_t, title_color, is_embossed=True)
             current_y += (bbox[3] - bbox[1]) + 20
         
@@ -354,7 +340,6 @@ def create_slide(data):
         
         for line in body_lines:
             bbox = draw.textbbox((0, 0), line.replace('*', ''), font=font_b)
-            # [수정] 하이라이트 함수 사용 (양각 효과 포함)
             draw_line_with_highlight(draw, margin_x, current_y, line, font_b, body_color, is_embossed=True)
             current_y += (bbox[3] - bbox[1]) + 15
             
@@ -398,14 +383,12 @@ def create_slide(data):
     else: # 일반 내용 페이지
         for line in title_lines:
             bbox = draw.textbbox((0, 0), line.replace('*', ''), font=font_t)
-            # [수정] 하이라이트 함수 사용 (일반 텍스트)
             draw_line_with_highlight(draw, margin_x, current_y, line, font_t, title_color, is_embossed=False)
             current_y += (bbox[3] - bbox[1]) + 20
         if body_lines:
             current_y += 30 
             for line in body_lines:
                 bbox = draw.textbbox((0, 0), line.replace('*', ''), font=font_b)
-                # [수정] 하이라이트 함수 사용 (일반 텍스트)
                 draw_line_with_highlight(draw, margin_x, current_y, line, font_b, body_color, is_embossed=False)
                 current_y += (bbox[3] - bbox[1]) + 15
 
@@ -419,13 +402,15 @@ def create_slide(data):
         logo.thumbnail((80, 80))
         logo_x = (CANvas_WIDTH - logo.width) // 2
         
+        # 로고 위치: -140
         logo_y = CANvas_HEIGHT - 140 
         img.paste(logo, (logo_x, logo_y), logo)
         
         if type == 'cover':
             font_footer = get_font(FONT_TITLE_NAME, 26)
             
-            footer_text_y = CANvas_HEIGHT - 130 
+            # 텍스트 위치: 로고와 동일 선상(옆)
+            footer_text_y = logo_y + 25 
             
             if category:
                 draw.text((ALIGN_LEFT_X, footer_text_y), category, font=font_footer, fill=title_color, anchor="lm")
@@ -540,7 +525,8 @@ st.markdown("---")
 st.header("📝 슬라이드 편집")
 st.caption("💡 모든 텍스트는 좌측 기준선에 맞춰 깔끔하게 정렬됩니다. **강조하고 싶은 단어 양옆에 *(별표)를 붙여보세요!**")
 
-num_pages = st.number_input("내용 페이지 수", min_value=1, value=3, key="num_pages_setting")
+# [수정] 기본값 8로 변경
+num_pages = st.number_input("내용 페이지 수", min_value=1, value=8, key="num_pages_setting")
 total_pages = 1 + num_pages + 1
 tabs = st.tabs(["표지"] + [f"내용 {i+1}" for i in range(num_pages)] + ["아웃트로"])
 
