@@ -336,6 +336,7 @@ def create_slide(data):
             draw_line_with_highlight(draw, margin_x, current_y, line, font_t, title_color, is_embossed=True)
             current_y += (bbox[3] - bbox[1]) + 20
         
+        # 부제목 간격 (20으로 유지)
         current_y += 20
         
         for line in body_lines:
@@ -402,13 +403,15 @@ def create_slide(data):
         logo.thumbnail((80, 80))
         logo_x = (CANvas_WIDTH - logo.width) // 2
         
+        # 로고 위치: -140
         logo_y = CANvas_HEIGHT - 140 
         img.paste(logo, (logo_x, logo_y), logo)
         
         if type == 'cover':
             font_footer = get_font(FONT_TITLE_NAME, 26)
             
-            footer_text_y = CANvas_HEIGHT - 130 
+            # 텍스트 위치: 로고와 동일 선상(옆)
+            footer_text_y = logo_y + 25 
             
             if category:
                 draw.text((ALIGN_LEFT_X, footer_text_y), category, font=font_footer, fill=title_color, anchor="lm")
@@ -478,11 +481,13 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
                     st.image(img['urls']['thumb'], use_container_width=True)
                     exists = any(x['id'] == img['id'] for x in st.session_state['gallery_images'])
                     if not exists:
-                        if st.button("담기", key=f"add_{img['id']}"):
+                        # [오류 해결] key값에 index(i) 추가하여 중복 방지
+                        if st.button("담기", key=f"add_{img['id']}_{i}"):
                             st.session_state['gallery_images'].append(img)
                             st.rerun()
                     else:
-                        st.button("✅", key=f"done_{img['id']}", disabled=True)
+                        # [오류 해결] key값에 index(i) 추가
+                        st.button("✅", key=f"done_{img['id']}_{i}", disabled=True)
 
     # B. 업로드
     with c2:
@@ -546,11 +551,14 @@ def editor_ui(key, use_slider=False, is_outro=False):
     
     st.write("배경 설정:")
     
-    # [수정] 아웃트로 강제 고정 해제 (사용자가 다시 선택 가능하게 복구)
-    bg_key = st.selectbox("배경 이미지 선택", list(bg_options.keys()), key=f"bg_{key}")
-    use_tint = st.checkbox("배경 어둡게 하기 (Tint)", value=True, key=f"tint_{key}")
-    credit_text = st.text_input("이미지 출처 (예: 작가명)", help="비워두면 Pexels/Unsplash 등은 자동 표기됩니다.", key=f"cr_{key}")
-    return layout, t_col, b_col, bg_options[bg_key], use_tint, credit_text
+    if is_outro:
+        st.info("🖼️ 아웃트로 배경은 'outro.png'로 고정됩니다.")
+        return layout, t_col, b_col, os.path.join(ASSETS_DIR, "outro.png"), False, ""
+    else:
+        bg_key = st.selectbox("배경 이미지 선택", list(bg_options.keys()), key=f"bg_{key}")
+        use_tint = st.checkbox("배경 어둡게 하기 (Tint)", value=True, key=f"tint_{key}")
+        credit_text = st.text_input("이미지 출처 (예: 작가명)", help="비워두면 Pexels/Unsplash 등은 자동 표기됩니다.", key=f"cr_{key}")
+        return layout, t_col, b_col, bg_options[bg_key], use_tint, credit_text
 
 # (1) 표지
 with tabs[0]:
@@ -622,7 +630,7 @@ with tabs[-1]:
     else: selected_brand_color_outro = "#BDBBEC"
 
     # [수정] 아웃트로도 일반 선택 가능하게 변경
-    layout, t_col, b_col, bg, use_tint, credit_text = editor_ui("outro", use_slider=True)
+    layout, t_col, b_col, bg, use_tint, credit_text = editor_ui("outro", use_slider=True, is_outro=False) # is_outro=False로 변경
     st.session_state['slide_configs'][total_pages-1] = {
         "type": "outro", "title": t, "content": c, "bg_source": bg, 
         "layout": layout, "title_color": t_col, "body_color": b_col, "credit_text": credit_text,
