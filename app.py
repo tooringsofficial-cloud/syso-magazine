@@ -411,7 +411,7 @@ def create_slide(data):
             font_footer = get_font(FONT_TITLE_NAME, 26)
             
             # 텍스트 위치: 로고와 동일 선상(옆)
-            footer_text_y = logo_y + 25 
+            footer_text_y = logo_y + 10 
             
             if category:
                 draw.text((ALIGN_LEFT_X, footer_text_y), category, font=font_footer, fill=title_color, anchor="lm")
