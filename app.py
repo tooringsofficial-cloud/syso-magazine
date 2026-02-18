@@ -131,7 +131,8 @@ def draw_embossed_text(draw, xy, text, font, fill_color="#FFFFFF"):
     draw.text((x+1, y+1), text, font=font, fill="#333333") 
     draw.text((x, y), text, font=font, fill=fill_color)
 
-def draw_line_with_highlight(draw, x, y, text, font, text_color, is_embossed=False):
+# [수정] 하이라이트 색상을 인자로 받도록 변경
+def draw_line_with_highlight(draw, x, y, text, font, text_color, highlight_color, is_embossed=False):
     parts = text.split('*')
     current_x = x
     
@@ -144,7 +145,8 @@ def draw_line_with_highlight(draw, x, y, text, font, text_color, is_embossed=Fal
             font_size = font.size
             rect_y1 = y + (font_size * 0.2) 
             rect_y2 = y + (font_size * 1.1)
-            draw.rectangle([(current_x, rect_y1), (current_x + len_w, rect_y2)], fill=HIGHLIGHT_COLOR)
+            # 입력받은 하이라이트 색상 사용
+            draw.rectangle([(current_x, rect_y1), (current_x + len_w, rect_y2)], fill=highlight_color)
         
         if is_embossed:
             draw_embossed_text(draw, (current_x, y), part, font, text_color)
@@ -212,6 +214,8 @@ def create_slide(data):
     user_credit = data.get('credit_text', '').strip()
     
     page_brand_color = data.get('brand_color', BRAND_COLOR)
+    # [수정] 설정된 하이라이트 색상 가져오기
+    slide_hl_color = data.get('hl_color', HIGHLIGHT_COLOR)
 
     img = Image.new('RGB', (CANvas_WIDTH, CANvas_HEIGHT), "#1A1A1A")
     draw = ImageDraw.Draw(img)
@@ -333,15 +337,16 @@ def create_slide(data):
     if type == 'cover': 
         for line in title_lines:
             bbox = draw.textbbox((0, 0), line.replace('*', ''), font=font_t)
-            draw_line_with_highlight(draw, margin_x, current_y, line, font_t, title_color, is_embossed=True)
+            # [수정] slide_hl_color 전달
+            draw_line_with_highlight(draw, margin_x, current_y, line, font_t, title_color, slide_hl_color, is_embossed=True)
             current_y += (bbox[3] - bbox[1]) + 20
         
-        # 부제목 간격 (20으로 유지)
         current_y += 20
         
         for line in body_lines:
             bbox = draw.textbbox((0, 0), line.replace('*', ''), font=font_b)
-            draw_line_with_highlight(draw, margin_x, current_y, line, font_b, body_color, is_embossed=True)
+            # [수정] slide_hl_color 전달
+            draw_line_with_highlight(draw, margin_x, current_y, line, font_b, body_color, slide_hl_color, is_embossed=True)
             current_y += (bbox[3] - bbox[1]) + 15
             
     elif type == 'outro':
@@ -384,13 +389,15 @@ def create_slide(data):
     else: # 일반 내용 페이지
         for line in title_lines:
             bbox = draw.textbbox((0, 0), line.replace('*', ''), font=font_t)
-            draw_line_with_highlight(draw, margin_x, current_y, line, font_t, title_color, is_embossed=False)
+            # [수정] slide_hl_color 전달
+            draw_line_with_highlight(draw, margin_x, current_y, line, font_t, title_color, slide_hl_color, is_embossed=False)
             current_y += (bbox[3] - bbox[1]) + 20
         if body_lines:
             current_y += 30 
             for line in body_lines:
                 bbox = draw.textbbox((0, 0), line.replace('*', ''), font=font_b)
-                draw_line_with_highlight(draw, margin_x, current_y, line, font_b, body_color, is_embossed=False)
+                # [수정] slide_hl_color 전달
+                draw_line_with_highlight(draw, margin_x, current_y, line, font_b, body_color, slide_hl_color, is_embossed=False)
                 current_y += (bbox[3] - bbox[1]) + 15
 
     # [말풍선 그리기]
@@ -403,15 +410,13 @@ def create_slide(data):
         logo.thumbnail((80, 80))
         logo_x = (CANvas_WIDTH - logo.width) // 2
         
-        # 로고 위치: -140
         logo_y = CANvas_HEIGHT - 140 
         img.paste(logo, (logo_x, logo_y), logo)
         
         if type == 'cover':
             font_footer = get_font(FONT_TITLE_NAME, 26)
             
-            # 텍스트 위치: 로고와 동일 선상(옆)
-            footer_text_y = logo_y + 10 
+            footer_text_y = CANvas_HEIGHT - 130 
             
             if category:
                 draw.text((ALIGN_LEFT_X, footer_text_y), category, font=font_footer, fill=title_color, anchor="lm")
@@ -443,13 +448,10 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
     # A. 멀티 소스 검색
     with c1:
         st.subheader("1. 이미지 검색")
-        # [수정] Key 추가
         source_type = st.radio("검색 소스", ["Unsplash", "Pexels", "Pixabay"], horizontal=True, key="search_source")
         col_s1, col_s2, col_s3 = st.columns([2, 1, 1])
-        # [수정] Key 추가
         query = col_s1.text_input("검색어 (영문)", value="aesthetic", key="search_query")
         
-        # [수정] Key 추가
         if col_s2.button("검색", key="btn_search"):
             st.session_state['search_page'] = 1 
             results = []
@@ -460,7 +462,6 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
             if results: st.session_state['search_temp'] = results
             else: st.warning("검색 결과가 없거나 API 키를 확인해주세요.")
         
-        # [수정] Key 추가
         if col_s3.button("더보기", key="btn_more"):
             st.session_state['search_page'] += 1
             new_results = []
@@ -481,18 +482,15 @@ with st.expander("🖼️ 이미지 갤러리 (멀티 소스 & 업로드)", expa
                     st.image(img['urls']['thumb'], use_container_width=True)
                     exists = any(x['id'] == img['id'] for x in st.session_state['gallery_images'])
                     if not exists:
-                        # [오류 해결] key값에 index(i) 추가하여 중복 방지
                         if st.button("담기", key=f"add_{img['id']}_{i}"):
                             st.session_state['gallery_images'].append(img)
                             st.rerun()
                     else:
-                        # [오류 해결] key값에 index(i) 추가
                         st.button("✅", key=f"done_{img['id']}_{i}", disabled=True)
 
     # B. 업로드
     with c2:
         st.subheader("2. 내 이미지 업로드")
-        # [수정] Key 추가 (가장 중요)
         uploaded_files = st.file_uploader("이미지 파일 선택", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True, key="uploader")
         if uploaded_files:
             for uf in uploaded_files:
@@ -528,7 +526,6 @@ st.markdown("---")
 st.header("📝 슬라이드 편집")
 st.caption("💡 모든 텍스트는 좌측 기준선에 맞춰 깔끔하게 정렬됩니다. **강조하고 싶은 단어 양옆에 *(별표)를 붙여보세요!**")
 
-# [수정] 기본값 8로 변경
 num_pages = st.number_input("내용 페이지 수", min_value=1, value=8, key="num_pages_setting")
 total_pages = 1 + num_pages + 1
 tabs = st.tabs(["표지"] + [f"내용 {i+1}" for i in range(num_pages)] + ["아웃트로"])
@@ -538,6 +535,7 @@ for i, img in enumerate(st.session_state['gallery_images']):
     label = f"[{img['source']}] 이미지 {i+1}" if img['source'] != 'Upload' else f"[내 사진] {img['name']}"
     bg_options[label] = img['urls']['regular']
 
+# [수정] hl_color 반환 추가
 def editor_ui(key, use_slider=False, is_outro=False): 
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -553,12 +551,14 @@ def editor_ui(key, use_slider=False, is_outro=False):
     
     if is_outro:
         st.info("🖼️ 아웃트로 배경은 'outro.png'로 고정됩니다.")
-        return layout, t_col, b_col, os.path.join(ASSETS_DIR, "outro.png"), False, ""
+        return layout, t_col, b_col, os.path.join(ASSETS_DIR, "outro.png"), False, "", HIGHLIGHT_COLOR
     else:
         bg_key = st.selectbox("배경 이미지 선택", list(bg_options.keys()), key=f"bg_{key}")
         use_tint = st.checkbox("배경 어둡게 하기 (Tint)", value=True, key=f"tint_{key}")
+        # [신규] 하이라이트 색상 설정 입력칸
+        hl_color = st.text_input("하이라이트 색상 (HEX)", value="#BDBBEC", key=f"hl_{key}")
         credit_text = st.text_input("이미지 출처 (예: 작가명)", help="비워두면 Pexels/Unsplash 등은 자동 표기됩니다.", key=f"cr_{key}")
-        return layout, t_col, b_col, bg_options[bg_key], use_tint, credit_text
+        return layout, t_col, b_col, bg_options[bg_key], use_tint, credit_text, hl_color
 
 # (1) 표지
 with tabs[0]:
@@ -571,7 +571,6 @@ with tabs[0]:
     title_size = st.slider("제목 크기", min_value=40, max_value=150, value=90, key="title_size_cover")
     sub_size = st.slider("부제목 크기", min_value=30, max_value=80, value=45, key="sub_size_cover")
     
-    # [수정] 표지 로고 색상 선택 옵션 추가 (색상 변경: #Ffeb2e, #BDBBEC 추가)
     brand_color_choice = st.radio("로고 포인트 색상", ["#C2FF00 (기본)", "#Ffeb2e (노랑)", "#BDBBEC (연보라)"], horizontal=True, key="color_cover")
     if "C2FF00" in brand_color_choice: selected_brand_color = "#C2FF00"
     elif "Ffeb2e" in brand_color_choice: selected_brand_color = "#Ffeb2e"
@@ -583,15 +582,17 @@ with tabs[0]:
         bubble_x = b_c1.slider("가로 위치 (X)", 0, CANvas_WIDTH, 540, key="bub_x_cover")
         bubble_y = b_c2.slider("세로 위치 (Y)", 0, CANvas_HEIGHT, 500, key=f"bub_y_cover")
     
-    layout, t_col, b_col, bg, use_tint, credit_text = editor_ui("cover", use_slider=False)
+    # [수정] hl_color 받기
+    layout, t_col, b_col, bg, use_tint, credit_text, hl_color = editor_ui("cover", use_slider=False)
     
     st.session_state['slide_configs'][0] = {
         "type": "cover", "title": t, "content": c, "category": category, "keyword": keyword,
         "bg_source": bg, "layout": layout, "title_color": t_col, "body_color": b_col,
         "sub_size": sub_size, "use_tint": use_tint, "credit_text": credit_text,
         "bubble_text": bubble_text, "bubble_x": bubble_x, "bubble_y": bubble_y,
-        "brand_color": selected_brand_color, # 색상 저장
-        "title_size": title_size 
+        "brand_color": selected_brand_color, 
+        "title_size": title_size,
+        "hl_color": hl_color # 하이라이트 색상 전달
     }
 
 # (2) 내용
@@ -607,13 +608,15 @@ for i in range(num_pages):
             bubble_x = b_c1.slider("가로 위치 (X)", 0, CANvas_WIDTH, 540, key=f"bub_x_{i}")
             bubble_y = b_c2.slider("세로 위치 (Y)", 0, CANvas_HEIGHT, 500, key=f"bub_y_{i}")
 
-        layout, t_col, b_col, bg, use_tint, credit_text = editor_ui(f"cont_{i}", use_slider=True)
+        # [수정] hl_color 받기
+        layout, t_col, b_col, bg, use_tint, credit_text, hl_color = editor_ui(f"cont_{i}", use_slider=True)
         
         st.session_state['slide_configs'][i+1] = {
             "type": "content", "title": t, "content": c, "bg_source": bg, 
             "layout": layout, "title_color": t_col, "body_color": b_col,
             "body_size": body_size, "use_tint": use_tint, "credit_text": credit_text,
-            "bubble_text": bubble_text, "bubble_x": bubble_x, "bubble_y": bubble_y
+            "bubble_text": bubble_text, "bubble_x": bubble_x, "bubble_y": bubble_y,
+            "hl_color": hl_color # 하이라이트 색상 전달
         }
 
 # (3) 아웃트로
@@ -623,23 +626,22 @@ with tabs[-1]:
     
     st.caption("💡 (LIFE)를 지우고 알맞은 키워드로 바꿔주세요.")
     
-    # [수정] 아웃트로 포인트 색상 선택 옵션 추가 (색상 변경: #Ffeb2e, #BDBBEC 추가)
     brand_color_choice_outro = st.radio("키워드 포인트 색상", ["#C2FF00 (기본)", "#Ffeb2e (노랑)", "#BDBBEC (연보라)"], horizontal=True, key="color_outro")
     if "C2FF00" in brand_color_choice_outro: selected_brand_color_outro = "#C2FF00"
     elif "Ffeb2e" in brand_color_choice_outro: selected_brand_color_outro = "#Ffeb2e"
     else: selected_brand_color_outro = "#BDBBEC"
 
-    # [수정] 아웃트로도 일반 선택 가능하게 변경
-    layout, t_col, b_col, bg, use_tint, credit_text = editor_ui("outro", use_slider=True, is_outro=False) # is_outro=False로 변경
+    # [수정] hl_color 받기
+    layout, t_col, b_col, bg, use_tint, credit_text, hl_color = editor_ui("outro", use_slider=True, is_outro=False) 
     st.session_state['slide_configs'][total_pages-1] = {
         "type": "outro", "title": t, "content": c, "bg_source": bg, 
         "layout": layout, "title_color": t_col, "body_color": b_col, "credit_text": credit_text,
-        "brand_color": selected_brand_color_outro # 색상 저장
+        "brand_color": selected_brand_color_outro,
+        "hl_color": hl_color # 하이라이트 색상 전달
     }
 
 # --- 3. 생성 ---
 st.markdown("---")
-# [수정] Key 추가
 if st.button("✨ 이미지 생성 및 다운로드", key="btn_generate"):
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, "w") as zf:
